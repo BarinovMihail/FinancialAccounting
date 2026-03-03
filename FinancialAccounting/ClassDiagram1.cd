@@ -1,0 +1,208 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="FinancialAccounting.AddAccountWindow" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="4" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAABAAAAAAAAAABAAAAAAAAAAAIAAAAAIAAAAEAAA=</HashCode>
+      <FileName>AddAccountWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.AnalyticsWindow" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="5.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAEAAAAAAAAACAAAAAAAAAAAAUgCAAAAA=</HashCode>
+      <FileName>AnalyticsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.TransactionPoint" Collapsed="true">
+    <Position X="9.25" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAgAAAAAAAAAACAAAAAAAABAAAAAAAAAAA=</HashCode>
+      <FileName>AnalyticsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.App" Collapsed="true">
+    <Position X="7.5" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>App.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.DatabaseManager" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="9.25" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAACAAAAgAEAABABAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\DatabaseManager.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.EmailService" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="2.25" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\EmailService .cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.OfxExporter" Collapsed="true">
+    <Position X="0.5" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAABAA=</HashCode>
+      <FileName>Class\OfxExporter.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.OfxParser" Collapsed="true">
+    <Position X="2.25" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAA=</HashCode>
+      <FileName>Class\OfxParser.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.SberbankPdfParser" Collapsed="true">
+    <Position X="2.25" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\Parsers\PdfParser.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.UserService" Collapsed="true">
+    <Position X="4" Y="4.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\UserService.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.DataUploadWindow" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="0.5" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>gAAAAAAAAACAAgAEAgBARAAgAAAAAAAAAAIECCABAAA=</HashCode>
+      <FileName>DataUploadWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.TransactionRecord" Collapsed="true">
+    <Position X="0.5" Y="4.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAgAAAAAAgAAACAAAAAAAABAQAAAAAACAA=</HashCode>
+      <FileName>DataUploadWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.LoginWindow" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="4" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>QAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAICAAAAAAAA=</HashCode>
+      <FileName>LoginWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.MainWindow" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="5.75" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAQABAAAABBAgAAEEAAAEAAAEAAIACAAAAAA=</HashCode>
+      <FileName>MainWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.RegisterWindow" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="5.75" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAQAAAAAAAAAAAAAAAEAAAAAAAAAAIAEACAAAAA=</HashCode>
+      <FileName>RegisterWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.ReportsWindow" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="9.25" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>CAAAACAAMABAEAAAAAAgAAAABAEAAAAIAQgEgiAAQAA=</HashCode>
+      <FileName>ReportsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.SettingsWindow" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="5.75" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAABAAAQABAAAAAAADAAEAIBAEAAAIAAIAACIAAAA=</HashCode>
+      <FileName>SettingsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.Account" Collapsed="true">
+    <Position X="0.5" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAACAAAAAAAAAAAEAAAAAAAAAAgAAAAAABAAAAAAAAA=</HashCode>
+      <FileName>SettingsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.MistralService" Collapsed="true">
+    <Position X="9.25" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAQAAAAAACAgBAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\MistralService.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.MistralResponse" Collapsed="true">
+    <Position X="7.5" Y="1.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\MistralService.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.TransactionService" Collapsed="true">
+    <Position X="2.25" Y="4.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAgAAAAAAAAAAAAAAAAAAAAAAIAAAAAAIEAAAAAAA=</HashCode>
+      <FileName>Class\TransactionService.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.Parsers.TinkoffPdfParser" Collapsed="true">
+    <Position X="7.5" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\Parsers\TinkoffPdfParser.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="PasswordEncryptor" Collapsed="true">
+    <Position X="4" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AQAAAAAAAAAAAAAQAAAEAAAAAAAAAAAAAAAAAAAAIAA=</HashCode>
+      <FileName>Class\PasswordEncryptor.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="AccountInfo" Collapsed="true">
+    <Position X="2.25" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAACEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>MainWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ReportRecord" Collapsed="true">
+    <Position X="7.5" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAgAAAAAAAAAACAAAAAAAABAQAAAAAACAA=</HashCode>
+      <FileName>ReportsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Properties.Resources" Collapsed="true">
+    <Position X="0.5" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAABEAAAAQAAAAAAAAAAAAAAAIA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Properties.Settings" Collapsed="true">
+    <Position X="4" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAIAAAAAABAAAAAAAAAAAAAAA=</HashCode>
+    </TypeIdentifier>
+  </Class>
+  <Interface Name="FinancialAccounting.IEmailService" Collapsed="true">
+    <Position X="0.5" Y="5.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\IEmailService.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

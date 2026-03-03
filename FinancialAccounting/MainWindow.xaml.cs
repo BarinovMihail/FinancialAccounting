@@ -1,5 +1,9 @@
-﻿using System;
+﻿using LiveCharts;
+using LiveCharts.Wpf;
+using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel; // Убрал дублирующийся using
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,10 +15,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using System.Collections.Generic;
-using LiveCharts;
-using LiveCharts.Wpf;
-using System.Collections.ObjectModel;
+
 namespace FinancialAccounting
 {
     /// <summary>
@@ -31,7 +32,8 @@ namespace FinancialAccounting
             LoadAccounts(_username);
 
         }
-        private void LoadCharts(int userId, int accountId)
+
+        private void LoadCharts(int accountId)
         {
             var expenseData = new Dictionary<string, double>();
             var incomeData = new Dictionary<string, double>();
@@ -42,66 +44,102 @@ namespace FinancialAccounting
                 using (var cmd = conn.CreateCommand())
                 {
                     cmd.CommandText = @"
-                SELECT c.name AS category, t.amount, t.type
-                FROM transactions t
-                LEFT JOIN categories c ON t.categoryid = c.id
-                WHERE t.userid = @userId AND t.accountid = @accountId;
-            ";
-
-                    cmd.Parameters.AddWithValue("userId", userId);
+                    SELECT COALESCE(c.name, 'Без категории') AS category,
+                     t.type,
+                     SUM(t.amount) AS total_amount
+                     FROM transactions t
+                        LEFT JOIN categories c ON t.categoryid = c.id
+                        WHERE t.accountid = @accountId
+                        AND LOWER(COALESCE(c.name, '')) NOT LIKE 'тест%'
+                        GROUP BY COALESCE(c.name, 'Без категории'), t.type;
+                            ";
                     cmd.Parameters.AddWithValue("accountId", accountId);
 
                     using (var reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
-                            string category = reader["category"] as string ?? "Без категории";
-                            double amount = Convert.ToDouble(reader["amount"]);
-                            string type = reader["type"].ToString().ToLower();
+                            string category = reader["category"]?.ToString() ?? "Без категории";
+                            string type = reader["type"]?.ToString()?.ToLower() ?? "";
+                            double amount = Convert.ToDouble(reader["total_amount"]);
+
+                            // Если расходы хранятся отрицательными — приводим к положительным
+                            if (type == "expense") amount = Math.Abs(amount);
 
                             if (type == "expense")
-                            {
-                                if (expenseData.ContainsKey(category))
-                                    expenseData[category] += amount;
-                                else
-                                    expenseData[category] = amount;
-                            }
+                                expenseData[category] = expenseData.TryGetValue(category, out var v) ? v + amount : amount;
                             else if (type == "income")
-                            {
-                                if (incomeData.ContainsKey(category))
-                                    incomeData[category] += amount;
-                                else
-                                    incomeData[category] = amount;
-                            }
+                                incomeData[category] = incomeData.TryGetValue(category, out var v) ? v + amount : amount;
                         }
                     }
                 }
             }
 
-            // Обновляем график расходов
-            ExpenseChart.Series = new SeriesCollection();
-            foreach (var kvp in expenseData)
+            BuildTop5Pie(ExpenseChart, expenseData);
+            BuildTop5Pie(IncomeChart, incomeData);
+        }
+
+        private void BuildTop5Pie(LiveCharts.Wpf.PieChart chart, Dictionary<string, double> data)
+        {
+            chart.Series = new SeriesCollection();
+            if (data == null || data.Count == 0) return;
+
+            double total = data.Values.Sum();
+            if (total <= 0) return;
+
+            // настройки
+            const int topN = 6;              // можно 5-7
+            const int minPercentToShow = 3;  // <-- порог (2 или 3 обычно лучше всего)
+
+            // LabelPoint лучше через Participation
+            Func<ChartPoint, string> labelPoint = cp => cp.Participation.ToString("P0", CultureInfo.InvariantCulture);
+
+            bool Show(double value)
             {
-                ExpenseChart.Series.Add(new PieSeries
+                var percent = (value / total) * 100.0;
+                var rounded = (int)Math.Round(percent, 0, MidpointRounding.AwayFromZero);
+                return rounded >= minPercentToShow;
+            }
+
+            var top = data.OrderByDescending(x => x.Value).Take(topN).ToList();
+            double topSum = top.Sum(x => x.Value);
+
+            // "прочее" = всё, что не попало в topN + (опционально) то, что ниже порога
+            // Чтобы избежать ситуации, когда topN набрали много мелочи, можно сначала отделить "мелочь" по порогу:
+            var big = top.Where(x => Show(x.Value)).ToList();
+            double bigSum = big.Sum(x => x.Value);
+
+            // Сумма мелких из topN + оставшиеся категории
+            double otherSum = Math.Max(0, total - bigSum);
+
+            foreach (var kvp in big)
+            {
+                chart.Series.Add(new PieSeries
                 {
                     Title = kvp.Key,
                     Values = new ChartValues<double> { kvp.Value },
-                    DataLabels = true
+                    DataLabels = true,
+                    LabelPoint = labelPoint,
+                    Foreground = Brushes.Black,
+                    FontSize = 14
                 });
             }
 
-            // Обновляем график доходов
-            IncomeChart.Series = new SeriesCollection();
-            foreach (var kvp in incomeData)
+            if (otherSum > 0 && Show(otherSum))
             {
-                IncomeChart.Series.Add(new PieSeries
+                chart.Series.Add(new PieSeries
                 {
-                    Title = kvp.Key,
-                    Values = new ChartValues<double> { kvp.Value },
-                    DataLabels = true
+                    Title = "Прочее",
+                    Values = new ChartValues<double> { otherSum },
+                    DataLabels = true,
+                    LabelPoint = labelPoint,
+                    Foreground = Brushes.Black,
+                    FontSize = 14
                 });
             }
         }
+
+
 
         private void LoadAccounts(string username)
         {
@@ -112,10 +150,13 @@ namespace FinancialAccounting
                 using (var db = new DatabaseManager())
                 using (var cmd = db.GetOpenConnection().CreateCommand())
                 {
+                    // ОБНОВЛЕННЫЙ SQL ЗАПРОС:
+                    // Вместо чтения accounts.bankname, делаем JOIN с таблицей banks
                     cmd.CommandText = @"
-                SELECT id, bankname, accountnumber
-                FROM accounts
-                WHERE userid = get_user_id(@username)";
+                        SELECT a.id, b.bankname, a.accountnumber
+                        FROM accounts a
+                        JOIN banks b ON a.bankid = b.id
+                        WHERE a.userid = get_user_id(@username)";
 
                     cmd.Parameters.AddWithValue("username", username);
 
@@ -123,7 +164,7 @@ namespace FinancialAccounting
                     {
                         while (reader.Read())
                         {
-                            string bankName = reader.GetString(1);
+                            string bankName = reader.GetString(1); // Теперь это берется из таблицы banks
                             string accountNumber = reader.GetString(2);
                             string last4 = accountNumber.Length >= 4 ? accountNumber.Substring(accountNumber.Length - 4) : "XXXX";
 
@@ -152,13 +193,18 @@ namespace FinancialAccounting
 
         private void AddAccount_Click(object sender, RoutedEventArgs e)
         {
+            // Передаем имя пользователя, чтобы создать счет для него
             var addAccountWindow = new AddAccountWindow(_username);
-            addAccountWindow.Show();    
+
+            // Подписываемся на закрытие окна добавления, чтобы обновить список счетов
+            addAccountWindow.Closed += (s, args) => LoadAccounts(_username);
+
+            addAccountWindow.ShowDialog(); // Используем ShowDialog, чтобы блокировать главное окно
         }
 
         private void Logout_Click(object sender, RoutedEventArgs e)
         {
-            var loginWindow = new LoginWindow(); 
+            var loginWindow = new LoginWindow();
             loginWindow.Show();
             this.Close();
         }
@@ -171,6 +217,8 @@ namespace FinancialAccounting
 
                 var uploadWindow = new DataUploadWindow(accountId, _username);
                 uploadWindow.ShowDialog();
+                // После закрытия окна загрузки графики могут измениться, стоит их обновить
+                LoadCharts(accountId);
             }
             else
             {
@@ -182,12 +230,12 @@ namespace FinancialAccounting
         {
             if (AccountComboBox.SelectedItem is AccountInfo selectedAccount)
             {
-                int userId = GetUserIdByUsername(_username);
+                int userId = GetUserIdByUsername(_username); // Это можно оптимизировать, но пока оставим
                 int accountId = selectedAccount.Id;
 
                 if (userId > 0 && accountId > 0)
                 {
-                    LoadCharts(userId, accountId);
+                    LoadCharts(accountId);
                 }
                 else
                 {
@@ -235,7 +283,7 @@ namespace FinancialAccounting
             {
                 MessageBox.Show("Пожалуйста, выберите счёт.");
             }
-            
+
         }
 
         private void Button_Click_2(object sender, RoutedEventArgs e)
@@ -244,7 +292,7 @@ namespace FinancialAccounting
             {
                 int accountId = selectedAccount.Id;
                 var analyticsWindow = new AnalyticsWindow(accountId);
-                analyticsWindow.Show();              
+                analyticsWindow.Show();
             }
             else
             {
@@ -254,18 +302,15 @@ namespace FinancialAccounting
 
         private void Button_Click_3(object sender, RoutedEventArgs e)
         {
-           
-    
-                var settingsWindow = new SettingsWindow(_username);
-                settingsWindow.Show();
-                this.Close();
-            
+            var settingsWindow = new SettingsWindow(_username);
+            settingsWindow.Show();
+            this.Close();
         }
     }
 }
+
 public class AccountInfo
 {
     public int Id { get; set; }
     public string DisplayName { get; set; } // Название для ComboBox
 }
-

@@ -1,0 +1,50 @@
+﻿<Window x:Class="FinancialAccounting.AnalysisFullScreenWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Анализ данных"
+        Background="#FFFDF9F3"
+        FontFamily="Segoe UI"
+        FontSize="14"
+        Foreground="#222"
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Анализ данных"
+                   FontSize="20"
+                   FontWeight="Bold"
+                   Foreground="#C76A00"
+                   Margin="0,0,0,10"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <!-- Лучше TextBox: можно выделять/копировать текст -->
+            <TextBox x:Name="AnalysisTextBox"
+                     IsReadOnly="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Disabled"
+                     Background="White"
+                     BorderBrush="#FFE0B2"
+                     BorderThickness="1"
+                     Padding="12"/>
+        </ScrollViewer>
+
+        <Button Grid.Row="2"
+                Content="Закрыть"
+                Width="120"
+                Height="34"
+                HorizontalAlignment="Left"
+                Margin="0,10,0,0"
+                Background="#A25B00"
+                Foreground="White"
+                BorderThickness="0"
+                Click="Close_Click"/>
+    </Grid>
+</Window>

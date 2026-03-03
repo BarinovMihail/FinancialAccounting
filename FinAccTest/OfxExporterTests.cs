@@ -1,4 +1,5 @@
 ﻿using FinancialAccounting;
+using FinancialAccounting.Class.Models;
 using System;
 using System.Collections.ObjectModel;
 using Xunit;

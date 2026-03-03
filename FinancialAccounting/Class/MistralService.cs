@@ -30,7 +30,7 @@ namespace FinancialAccounting.Class
                     new { role = "system", content = "Ты финансовый аналитик. Проанализируй данные, дай краткий вывод и краткую рекомендацию по оптимизации расходов(если есть данные о расходах) на русском." },
                     new { role = "user", content = inputData }
                 },
-                max_tokens = 500,
+                max_tokens = 2000,
                 temperature = 0.7
             };
 

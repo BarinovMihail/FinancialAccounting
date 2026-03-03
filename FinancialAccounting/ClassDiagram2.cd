@@ -1,0 +1,256 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="FinancialAccounting.AddAccountWindow" BaseTypeListCollapsed="true">
+    <Position X="17" Y="5.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAABAAAAAAAAAABAAAAAAAAAAAIAAAAAIAAAAEAAA=</HashCode>
+      <FileName>AddAccountWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.AnalyticsWindow" BaseTypeListCollapsed="true">
+    <Position X="1" Y="4.25" Width="1.5" />
+    <NestedTypes>
+      <Class Name="FinancialAccounting.AnalyticsWindow.ChartBucket" Collapsed="true">
+        <TypeIdentifier>
+          <NewMemberFileName>AnalyticsWindow.xaml.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Class>
+    </NestedTypes>
+    <TypeIdentifier>
+      <HashCode>ABgAAAAAAAAgEAAAAAAAAACgAAAAAAAIAAAUgCAAAAA=</HashCode>
+      <FileName>AnalyticsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.TransactionPoint">
+    <Position X="13.5" Y="5.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAgAAAAAAAAAACAAAAAAAABAAAAAAAACAA=</HashCode>
+      <FileName>AnalyticsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.DailyPoint">
+    <Position X="11.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAQ=</HashCode>
+      <FileName>AnalyticsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.DatabaseManager" BaseTypeListCollapsed="true">
+    <Position X="2.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAACAAAAgAEAABABAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\DatabaseManager.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.EmailService" BaseTypeListCollapsed="true">
+    <Position X="6.25" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\EmailService .cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.MlFeedbackRequest">
+    <Position X="6.25" Y="1.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\Models\MlFeedbackRequest.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.MlFeedbackItem">
+    <Position X="4.5" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\Models\MlFeedbackRequest.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.MlFeedbackResponse">
+    <Position X="15.25" Y="6.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAEAAAAgAAAAAAAAAAIAAAAAA=</HashCode>
+      <FileName>Class\Models\MlFeedbackRequest.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.SberbankPdfParser">
+    <Position X="6.25" Y="5.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\Parsers\SberPdfParser.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.DataUploadWindow" BaseTypeListCollapsed="true">
+    <Position X="18.75" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>gAAAAABAAACAEgAEAgBARAIgAAAAAAAAAAIECSABAAA=</HashCode>
+      <FileName>DataUploadWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.LoginWindow" BaseTypeListCollapsed="true">
+    <Position X="8" Y="2" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>QAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAICAAAAAAAA=</HashCode>
+      <FileName>LoginWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.MainWindow" BaseTypeListCollapsed="true">
+    <Position X="9.75" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAgAAAAAAQABAAAABBAgAAEEAAAEAAAEAAIACAAAAAA=</HashCode>
+      <FileName>MainWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.RegisterWindow" BaseTypeListCollapsed="true">
+    <Position X="4.5" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAQAAAAAAAAAAAAAAAEAAAAAAAAAAIAEACAAAAA=</HashCode>
+      <FileName>RegisterWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.ReportsWindow" BaseTypeListCollapsed="true">
+    <Position X="11.5" Y="3" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>CAAAACAAMABAEAAAAAAgAAAABAEAAAAIAQgEgiAAQAA=</HashCode>
+      <FileName>ReportsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.Account">
+    <Position X="1" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAACAAAAAAAAAAAEAAAAAAAAAAgAAAAAABAAAAAAAAA=</HashCode>
+      <FileName>SettingsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.MistralService">
+    <Position X="17" Y="3" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAQAAAAAACAgBAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\MistralService.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.MistralResponse">
+    <Position X="13.5" Y="0.5" Width="1.5" />
+    <NestedTypes>
+      <Class Name="FinancialAccounting.Class.MistralResponse.Choice" Collapsed="true">
+        <TypeIdentifier>
+          <NewMemberFileName>Class\MistralService.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Class>
+      <Class Name="FinancialAccounting.Class.MistralResponse.Message" Collapsed="true">
+        <TypeIdentifier>
+          <NewMemberFileName>Class\MistralService.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Class>
+    </NestedTypes>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\MistralService.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="MlApiClient" BaseTypeListCollapsed="true">
+    <Position X="2.75" Y="3.5" Width="1.5" />
+    <NestedTypes>
+      <Class Name="MlApiClient.FeedbackRequestDto" Collapsed="true">
+        <TypeIdentifier>
+          <NewMemberFileName>Class\Models\MlApiClient.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Class>
+      <Class Name="MlApiClient.FeedbackItemDto" Collapsed="true">
+        <TypeIdentifier>
+          <NewMemberFileName>Class\Models\MlApiClient.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Class>
+    </NestedTypes>
+    <TypeIdentifier>
+      <HashCode>QEAAAgAAAAAAAAAAABAAAAAAAAAAAAAIAAAAAAAAAAA=</HashCode>
+      <FileName>Class\Models\MlApiClient.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="AccountInfo">
+    <Position X="4.5" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAACEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>MainWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="ReportRecord">
+    <Position X="13.25" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAgAAAAAAAAAACAAAAAAAABAQAAAAAACAA=</HashCode>
+      <FileName>ReportsWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.Models.MlPredictedTransaction">
+    <Position X="9.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAIAAQAAAAAAAAgAAAAAAAAQAAAAA=</HashCode>
+      <FileName>Class\Models\MlPredictedTransaction.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.Models.MlPredictRequest">
+    <Position X="13.25" Y="2.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAA=</HashCode>
+      <FileName>Class\Models\MlPredictRequest.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.Models.MlPredictResponse">
+    <Position X="15.25" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\Models\MlPredictResponse.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.Models.MlTransaction">
+    <Position X="1" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAIAAAAAAAAAAAgAAAAAAAAQAAAAA=</HashCode>
+      <FileName>Class\Models\MlTransaction.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.Models.TransactionRecord" BaseTypeListCollapsed="true">
+    <Position X="15.25" Y="2.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAgBAAAIAgAAACAgAAAAAABAQAAAAAACAA=</HashCode>
+      <FileName>Class\Models\TransactionRecord.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" Collapsed="true" />
+  </Class>
+  <Class Name="FinancialAccounting.Class.Parsers.OzonPdfParser">
+    <Position X="8" Y="4.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>gAAAAABAAAAABAAAAAAAAAQAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\Parsers\OzonPdfParser.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="FinancialAccounting.Class.Parsers.TinkoffPdfParser">
+    <Position X="6.25" Y="3.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>gAAAAABAAAAABAAAAAAAAAQAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\Parsers\TinkoffPdfParser.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Interface Name="FinancialAccounting.IEmailService" Collapsed="true">
+    <Position X="2.75" Y="6.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\IEmailService.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Interface Name="FinancialAccounting.Class.IMlApiClient" Collapsed="true">
+    <Position X="4.5" Y="6.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>QEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Class\IMlApiClient.cs</FileName>
+    </TypeIdentifier>
+  </Interface>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>
