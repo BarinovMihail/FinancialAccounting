@@ -1,4 +1,10 @@
-﻿using System;
+﻿using ExcelDataReader;
+using FinancialAccounting.Class;
+using FinancialAccounting.Class.Models;
+using FinancialAccounting.Class.Parsers;
+using Microsoft.Win32;
+using Npgsql;
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -6,12 +12,10 @@ using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Transactions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using ExcelDataReader;
-using Microsoft.Win32;
-using Npgsql;
 using UglyToad.PdfPig;
 
 namespace FinancialAccounting
@@ -24,14 +28,54 @@ namespace FinancialAccounting
         private readonly int _accountId;
         private readonly string _username;
         private string selectedFilePath;
+        private readonly IMlApiClient _mlClient;
+
+        // Коллекция для привязки к DataGrid
+        private ObservableCollection<TransactionRecord> _transactions =
+            new ObservableCollection<TransactionRecord>();
         public DataUploadWindow(int accountId, string username)
+            : this(accountId, username, new MlApiClient())
+        {
+        }
+        public DataUploadWindow(int accountId, string username, IMlApiClient mlClient)
+
         {
             InitializeComponent();
             _accountId = accountId;
             _username = username;
-            
+            TransactionsGrid.ItemsSource = _transactions;
+            _mlClient = mlClient;
+            LoadCategories();
+
+            if (btnTrainModel != null)
+                btnTrainModel.Visibility = Visibility.Collapsed;
         }
-        
+
+
+        private void LoadCategories()
+        {
+            CategoryComboBox.Items.Clear();
+            CategoryComboBox.Items.Add(new ComboBoxItem { Content = "Все", Tag = null });
+
+            using (var dbManager = new DatabaseManager())
+            {
+                var connection = dbManager.GetOpenConnection();
+                using (var command = new NpgsqlCommand("SELECT id, name FROM categories ORDER BY name", connection))
+                using (var reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        CategoryComboBox.Items.Add(new ComboBoxItem
+                        {
+                            Content = reader["name"].ToString(),
+                            Tag = reader.GetInt32(0)
+                        });
+                    }
+                }
+            }
+
+            CategoryComboBox.SelectedIndex = 0;
+        }
         private void RadioButton_Checked(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog
@@ -47,6 +91,32 @@ namespace FinancialAccounting
             }
         }
 
+        private void RadioButton_Checked_1(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog
+            {
+                Filter = "OFX Files|*.ofx",
+                Title = "Выберите OFX выписку"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                selectedFilePath = openFileDialog.FileName;
+                txtFileName.Text = System.IO.Path.GetFileName(openFileDialog.FileName);
+            }
+        }
+
+        private void RadioButton_Checked_2(object sender, RoutedEventArgs e)
+        {
+            TransactionsGrid.IsReadOnly = false;
+            TransactionsGrid.CanUserAddRows = true;
+
+            _transactions = new ObservableCollection<TransactionRecord>();
+            TransactionsGrid.ItemsSource = _transactions;
+
+            if (btnTrainModel != null) btnTrainModel.Visibility = Visibility.Collapsed;
+        }
+
         private async void Processing_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrEmpty(selectedFilePath))
@@ -55,13 +125,15 @@ namespace FinancialAccounting
                 return;
             }
 
+            // При загрузке новых данных сбрасываем кнопку обучения
+            if (btnTrainModel != null)
+                btnTrainModel.Visibility = Visibility.Collapsed;
+
             ProgressBar.Visibility = Visibility.Visible;
             ProgressText.Text = "Обработка файла...";
             ProgressBar.Value = 10;
 
-            await Task.Delay(100); 
-
-            ObservableCollection<TransactionRecord> transactions = new ObservableCollection<TransactionRecord>();
+            await Task.Delay(100);
             string fileExtension = System.IO.Path.GetExtension(selectedFilePath).ToLower();
 
             try
@@ -81,8 +153,15 @@ namespace FinancialAccounting
                             ProgressBar.Value = 10 + (currentPage * 80 / pageCount);
                         }
                     }
-
-                    transactions = PdfParser.ParsePdfText(rawText);
+                    string bank = DetectBank(rawText);
+                    if (bank == "Sber")
+                        _transactions = SberbankPdfParser.ParsePdfText(rawText);
+                    else if (bank == "Tinkoff")
+                        _transactions = TinkoffPdfParser.ParsePdfText(rawText);
+                    else if (bank == "Ozon")
+                        _transactions = OzonPdfParser.ParsePdfText(rawText);
+                    else
+                        MessageBox.Show("Не удалось определить банк.");
                 }
                 else if (fileExtension == ".xls" || fileExtension == ".xlsx" || fileExtension == ".xlsm")
                 {
@@ -130,7 +209,7 @@ namespace FinancialAccounting
                                         }
                                     }
 
-                                    transactions.Add(new TransactionRecord
+                                    _transactions.Add(new TransactionRecord
                                     {
                                         Date = date,
                                         Category = category,
@@ -150,7 +229,7 @@ namespace FinancialAccounting
                 }
                 else if (fileExtension == ".ofx")
                 {
-                    transactions = OfxParser.ParseOfx(selectedFilePath);
+                    _transactions = OfxParser.ParseOfx(selectedFilePath);
                 }
                 else
                 {
@@ -160,7 +239,7 @@ namespace FinancialAccounting
 
                 ProgressBar.Value = 100;
                 ProgressText.Text = "Обработка завершена.";
-                await Task.Delay(500); // чтобы пользователь успел увидеть прогресс
+                await Task.Delay(500);
             }
             catch (Exception ex)
             {
@@ -168,21 +247,148 @@ namespace FinancialAccounting
             }
             finally
             {
-                TransactionsGrid.ItemsSource = transactions;
+                TransactionsGrid.ItemsSource = _transactions;
+                Debug.WriteLine($"Parsed rows: {_transactions.Count}");
                 await Task.Delay(300);
                 ProgressBar.Visibility = Visibility.Collapsed;
                 ProgressText.Text = "";
             }
         }
 
+        // === КАТЕГОРИЗАЦИЯ (ML) ===
+        private async void Categorize_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (_transactions == null || _transactions.Count == 0)
+                {
+                    MessageBox.Show("Нет данных для категоризации. Сначала загрузите/обработайте файл.");
+                    return;
+                }
+
+                ProgressBar.Visibility = Visibility.Visible;
+                ProgressText.Text = "Категоризация транзакций...";
+                ProgressBar.Value = 10;
+
+                if (sender is Button btn) btn.IsEnabled = false;
+
+                var apiClient = _mlClient;
+
+                var list = _transactions.ToList();
+                list = await apiClient.CategorizeAsync(list);
+
+                _transactions.Clear();
+                foreach (var tr in list)
+                {
+                    tr.OriginalCategory = tr.Category;
+                    _transactions.Add(tr);
+                }
+
+                ProgressBar.Value = 100;
+                ProgressText.Text = "Категоризация завершена.";
+
+                if (btnTrainModel != null)
+                    btnTrainModel.Visibility = Visibility.Visible;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при категоризации: " + ex.Message,
+                                "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                await Task.Delay(500);
+                ProgressBar.Visibility = Visibility.Collapsed;
+                ProgressBar.Value = 0;
+                ProgressText.Text = string.Empty;
+
+                if (sender is Button btn) btn.IsEnabled = true;
+            }
+        }
+
+        private async void TeachModel_Click(object sender, RoutedEventArgs e)
+        {
+            if (_transactions == null || _transactions.Count == 0) return;
+
+
+            var changedTransactions = _transactions
+                .Where(t =>
+                    !string.IsNullOrWhiteSpace(t.Description) &&
+                    !string.IsNullOrWhiteSpace(t.Category) &&
+                    t.Category != t.OriginalCategory)
+                .ToList();
+
+            if (changedTransactions.Count == 0)
+            {
+                MessageBox.Show("Вы не внесли изменений в предложенные категории.\n" +
+                                "Дообучение необходимо, чтобы модель запомнила ваши исправления.",
+                                "Нет изменений для обучения", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            var res = MessageBox.Show(
+                $"Вы исправили {changedTransactions.Count} записей.\n" +
+                "Хотите обучить модель на этих исправлениях, чтобы она учитывала их в будущем?",
+                "Дообучение модели",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (res != MessageBoxResult.Yes) return;
+
+            try
+            {
+                ProgressBar.Visibility = Visibility.Visible;
+                ProgressText.Text = "Отправка данных на обучение...";
+                if (sender is Button btn) btn.IsEnabled = false;
+
+                var apiClient = new MlApiClient();
+                bool success = await apiClient.SendFeedbackAsync(changedTransactions);
+
+                if (success)
+                {
+                    foreach (var t in changedTransactions)
+                    {
+                        t.OriginalCategory = t.Category;
+                    }
+
+                    MessageBox.Show("Модель успешно дообучена! Спасибо за обратную связь.",
+                                    "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show("Не удалось дообучить модель. Проверьте, запущен ли сервер ML.",
+                                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка: {ex.Message}");
+            }
+            finally
+            {
+                ProgressBar.Visibility = Visibility.Collapsed;
+                ProgressText.Text = "";
+                if (sender is Button btn) btn.IsEnabled = true;
+            }
+        }
 
         private async void SaveDatabase_Click(object sender, RoutedEventArgs e)
         {
-            ObservableCollection<TransactionRecord> transactions = TransactionsGrid.ItemsSource as ObservableCollection<TransactionRecord>;
-            if (transactions == null || transactions.Count == 0)
+            if (_transactions == null || _transactions.Count == 0)
             {
                 MessageBox.Show("Нет данных для сохранения.");
                 return;
+            }
+
+            var hasChanges = _transactions.Any(t => t.Category != t.OriginalCategory && !string.IsNullOrEmpty(t.OriginalCategory));
+            if (hasChanges)
+            {
+                var trainRes = MessageBox.Show("Обнаружены исправленные категории. Хотите дообучить модель перед сохранением в базу?",
+                    "Совет", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (trainRes == MessageBoxResult.Yes)
+                {
+                    TeachModel_Click(btnTrainModel, e);
+                }
             }
 
             ProgressBar.Visibility = Visibility.Visible;
@@ -201,10 +407,10 @@ namespace FinancialAccounting
                         userId = Convert.ToInt32(userIdCmd.ExecuteScalar());
                     }
 
-                    int total = transactions.Count;
+                    int total = _transactions.Count;
                     int current = 0;
 
-                    foreach (var transaction in transactions)
+                    foreach (var transaction in _transactions)
                     {
                         int categoryId;
                         using (var checkCmd = new NpgsqlCommand("SELECT id FROM categories WHERE name = @name LIMIT 1", connection))
@@ -219,11 +425,10 @@ namespace FinancialAccounting
                             else
                             {
                                 using (var insertCategoryCmd = new NpgsqlCommand(
-                                    "INSERT INTO categories (name, userid) VALUES (@name, @userid) RETURNING id",
+                                    "INSERT INTO categories (name) VALUES (@name) RETURNING id",
                                     connection))
                                 {
                                     insertCategoryCmd.Parameters.AddWithValue("@name", transaction.Category);
-                                    insertCategoryCmd.Parameters.AddWithValue("@userid", userId);
                                     categoryId = Convert.ToInt32(insertCategoryCmd.ExecuteScalar());
                                 }
                             }
@@ -240,56 +445,55 @@ namespace FinancialAccounting
                         decimal.TryParse(rawAmount, NumberStyles.Number, new CultureInfo("ru-RU"), out amountValue);
                         string typeValue = transaction.Type;
 
-                        using (var duplicateCheckCmd = new NpgsqlCommand(@"
-                    SELECT COUNT(*) FROM transactions 
-                    WHERE date = @date 
-                    AND amount = @amount 
-                    AND description = @description 
-                    AND categoryid = @categoryid
-                    AND userid = @userid
-                    AND accountid = @accountid", connection))
+                        using (var duplicateCheckCmd = new NpgsqlCommand(
+     "SELECT id FROM transactions WHERE date=@date AND amount=@amount AND description=@description AND accountid=@accountid LIMIT 1", connection))
                         {
                             duplicateCheckCmd.Parameters.AddWithValue("@date", dt);
                             duplicateCheckCmd.Parameters.AddWithValue("@amount", amountValue);
                             duplicateCheckCmd.Parameters.AddWithValue("@description", transaction.Description ?? "");
-                            duplicateCheckCmd.Parameters.AddWithValue("@categoryid", categoryId);
-                            duplicateCheckCmd.Parameters.AddWithValue("@userid", userId);
                             duplicateCheckCmd.Parameters.AddWithValue("@accountid", _accountId);
 
-                            int count = Convert.ToInt32(duplicateCheckCmd.ExecuteScalar());
-                            if (count > 0)
+                            var existingIdObj = duplicateCheckCmd.ExecuteScalar();
+
+                            if (existingIdObj != null)
                             {
-                                current++;
-                                Application.Current.Dispatcher.Invoke(() =>
+
+                                int existingId = Convert.ToInt32(existingIdObj);
+
+                                using (var updateCmd = new NpgsqlCommand(
+                                    "UPDATE transactions SET categoryid = @catId WHERE id = @id", connection))
                                 {
-                                    ProgressBar.Value = (double)current / total * 100;
-                                });
+                                    updateCmd.Parameters.AddWithValue("@catId", categoryId);
+                                    updateCmd.Parameters.AddWithValue("@id", existingId);
+                                    updateCmd.ExecuteNonQuery();
+                                }
+
+                                current++;
+                                Application.Current.Dispatcher.Invoke(() => { ProgressBar.Value = (double)current / total * 100; });
                                 continue;
                             }
                         }
 
+
+                        // 3. Вставка
                         using (var insertTransactionCmd = new NpgsqlCommand(@"
-                    INSERT INTO transactions 
-                    (date, amount, type, categoryid, description, userid, accountid)
-                    VALUES 
-                    (@date, @amount, @type, @categoryid, @description, @userid, @accountid)", connection))
+                            INSERT INTO transactions 
+                            (date, amount, type, categoryid, description, accountid)
+                            VALUES 
+                            (@date, @amount,@type::transaction_type, @categoryid, @description, @accountid)", connection))
                         {
                             insertTransactionCmd.Parameters.AddWithValue("@date", dt);
                             insertTransactionCmd.Parameters.AddWithValue("@amount", amountValue);
                             insertTransactionCmd.Parameters.AddWithValue("@type", typeValue);
                             insertTransactionCmd.Parameters.AddWithValue("@categoryid", categoryId);
                             insertTransactionCmd.Parameters.AddWithValue("@description", transaction.Description ?? "");
-                            insertTransactionCmd.Parameters.AddWithValue("@userid", userId);
                             insertTransactionCmd.Parameters.AddWithValue("@accountid", _accountId);
 
                             insertTransactionCmd.ExecuteNonQuery();
                         }
 
                         current++;
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            ProgressBar.Value = (double)current / total * 100;
-                        });
+                        Application.Current.Dispatcher.Invoke(() => { ProgressBar.Value = (double)current / total * 100; });
                     }
                 }
             });
@@ -304,11 +508,12 @@ namespace FinancialAccounting
 
         private void ApplyFilter()
         {
+            if (TransactionsGrid == null) return;
             if (TransactionsGrid.ItemsSource is ObservableCollection<TransactionRecord> originalList)
             {
                 var filteredList = originalList.AsEnumerable();
 
-                // Фильтрация по категории
+                // Фильтр категории
                 if (CategoryComboBox.SelectedItem is ComboBoxItem selectedCategoryItem)
                 {
                     string selectedCategory = selectedCategoryItem.Content.ToString();
@@ -318,7 +523,7 @@ namespace FinancialAccounting
                     }
                 }
 
-                // Фильтрация по диапазону дат
+                // Фильтр дат
                 if (StartDatePicker.SelectedDate.HasValue)
                 {
                     filteredList = filteredList.Where(r =>
@@ -343,36 +548,20 @@ namespace FinancialAccounting
             }
         }
 
-        private void FilterDatePicker_SelectedDateChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        private void FilterDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();
+        private void CategoryComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => ApplyFilter();
+
+        private void Button_Click_2(object sender, RoutedEventArgs e) // Очистить
         {
             if (TransactionsGrid != null)
             {
-                ApplyFilter();
+                _transactions.Clear();
+                TransactionsGrid.ItemsSource = _transactions;
+                if (btnTrainModel != null) btnTrainModel.Visibility = Visibility.Collapsed;
             }
         }
 
-        private void CategoryComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-        {
-            if (TransactionsGrid != null)
-            {
-                ApplyFilter();
-            }
-        }
-
-        private void Button_Click_2(object sender, RoutedEventArgs e)
-        {
-            if (TransactionsGrid != null)
-            {
-                TransactionsGrid.ItemsSource = null; 
-                TransactionsGrid.Items.Clear();      
-            }
-        }
-
-        private void BackButton_Click(object sender, RoutedEventArgs e)
-        {
-
-            this.Close();
-        }
+        private void BackButton_Click(object sender, RoutedEventArgs e) => this.Close();
 
         private async void ExportToOfx_Click(object sender, RoutedEventArgs e)
         {
@@ -391,10 +580,7 @@ namespace FinancialAccounting
                 OfxExporter.ExportToFile(transactions, (current, total) =>
                 {
                     double progress = (double)current / total * 100;
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        ProgressBar.Value = progress;
-                    });
+                    Application.Current.Dispatcher.Invoke(() => { ProgressBar.Value = progress; });
                 });
             });
 
@@ -404,42 +590,34 @@ namespace FinancialAccounting
             ProgressText.Text = "";
         }
 
-
-        private void RadioButton_Checked_1(object sender, RoutedEventArgs e)
+        private string DetectBank(string text)
         {
-            OpenFileDialog openFileDialog = new OpenFileDialog
-            {
-                Filter = "OFX Files|*.ofx",
-                Title = "Выберите ofx выписку"
-            };
+            if (string.IsNullOrWhiteSpace(text)) return "Unknown";
 
-            if (openFileDialog.ShowDialog() == true)
-            {
-                selectedFilePath = openFileDialog.FileName;
-                txtFileName.Text = System.IO.Path.GetFileName(openFileDialog.FileName);
-            }
+            string normalizedText = text.ToLower();
+            int sberScore = 0;
+            int tinkoffScore = 0;
+            int ozonScore = 0;
+
+            if (normalizedText.Contains("www.sberbank.ru")) sberScore += 5;
+            if (normalizedText.Contains("пао сбербанк")) sberScore++;
+            if (normalizedText.Contains("выписка по счёту дебетовой карты")) sberScore++;
+            if (normalizedText.Contains("ул. вавилова, д. 19, москва")) sberScore++;
+
+            if (normalizedText.Contains("tbank.ru")) tinkoffScore += 5;
+            if (normalizedText.Contains("акционерное общество «тбанк»")) tinkoffScore++;
+            if (normalizedText.Contains("2-я хуторская")) tinkoffScore++;
+            if (normalizedText.Contains("справка о движении средств")) tinkoffScore++;
+
+            if (normalizedText.Contains("ооо «озон банк»")) ozonScore += 5;
+            if (normalizedText.Contains("пресненская набережная, дом 10")) ozonScore++;
+            if (normalizedText.Contains("лицензия банка россии № 3542")) ozonScore++;
+
+            if (sberScore > tinkoffScore && sberScore > ozonScore) return "Sber";
+            if (tinkoffScore > sberScore && tinkoffScore > ozonScore) return "Tinkoff";
+            if (ozonScore > sberScore && ozonScore > tinkoffScore) return "Ozon";
+
+            return "Unknown";
         }
-
-        private void RadioButton_Checked_2(object sender, RoutedEventArgs e)
-        {
-            TransactionsGrid.IsReadOnly = false;
-            TransactionsGrid.CanUserAddRows = true;
-
-            // Очистить предыдущие данные и подготовить к ручному вводу
-            TransactionsGrid.ItemsSource = new ObservableCollection<TransactionRecord>();
-        }
-
-        
-    }
-
-
-    public class TransactionRecord
-    {
-        public string Date { get; set; }
-        public string Category { get; set; }
-        public string Amount { get; set; }
-        public string Balance { get; set; }
-        public string Type { get; set; }
-        public string Description { get; set; }
     }
 }

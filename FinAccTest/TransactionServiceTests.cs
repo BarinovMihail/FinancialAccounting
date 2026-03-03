@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 using System.Collections.ObjectModel;
+using FinancialAccounting.Class.Models;
 
 namespace FinAccTest
 {
@@ -17,7 +18,7 @@ namespace FinAccTest
         public void SaveTransactions_ReturnsError_WhenEmpty()
         {
             string username = "qwert";
-            int accountId = 4;
+            int accountId = 1;
             var mockDb = new Mock<DatabaseManager>();
             var service = new TransactionService(mockDb.Object, username, accountId);
 
@@ -30,7 +31,7 @@ namespace FinAccTest
         public void SaveTransactions_ShouldInsertData_WhenValidInput()
         {
             string username = "qwert"; 
-            int accountId = 4;
+            int accountId = 1;
             var db = new DatabaseManager();
             var service = new TransactionService(db, username, accountId);
             var transactions = new List<TransactionRecord>

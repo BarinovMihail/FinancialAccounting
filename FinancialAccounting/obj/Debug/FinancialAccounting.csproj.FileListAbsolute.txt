@@ -141,7 +141,6 @@ C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\ru\Xceed.Wpf.AvalonDock.resources.dll
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\sv\Xceed.Wpf.AvalonDock.resources.dll
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\zh-Hans\Xceed.Wpf.AvalonDock.resources.dll
-C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\FinancialAccounting.csproj.SuggestedBindingRedirects.cache
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\AddAccountWindow.baml
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\AnalyticsWindow.baml
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\DataUploadWindow.baml
@@ -167,6 +166,18 @@ C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\FinancialAccounting.Properties.Resources.resources
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\FinancialAccounting.csproj.GenerateResource.cache
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\FinancialAccounting.csproj.CoreCompileInputs.cache
-C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\FinancialAccounting.csproj.CopyComplete
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\FinancialAccounting.exe
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\FinancialAccounting.pdb
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\FinancialAccounting.exe.config
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\Financia.EFB061F9.Up2Date
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\Newtonsoft.Json.dll
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\Newtonsoft.Json.xml
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\AnalysisFullScreenWindow.baml
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\AnalysisFullScreenWindow.g.cs
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\Microsoft.Bcl.Numerics.dll
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\System.CodeDom.dll
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\System.Collections.Immutable.dll
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\System.Numerics.Tensors.dll
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\Microsoft.Bcl.Numerics.xml
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\System.Collections.Immutable.xml
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\System.Numerics.Tensors.xml

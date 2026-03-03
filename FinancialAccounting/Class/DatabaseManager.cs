@@ -10,8 +10,7 @@ namespace FinancialAccounting
 
         public DatabaseManager()
         {
-            // Формируем строку подключения
-            connectionString = "Host=localhost;Database=FinancialAccounting;Username=postgres;Password=123";
+            connectionString = "Host=5942e-rw.db.pub.dbaas.postgrespro.ru; Database=dbproject;Username=barinov_ma; Password= AY4Q#2&L5b0;SslMode=Require;TrustServerCertificate=true";
         }
 
         /// <summary>

@@ -7,8 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="EcoCore" Version="7.2.0.17073" />
     <PackageReference Include="MailKit" Version="4.11.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Npgsql" Version="5.0.10" />
+    <PackageReference Include="NUnit" Version="4.4.0" />
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="6.1.0" />
     <PackageReference Include="Moq" Version="4.18.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
