@@ -609,15 +609,47 @@ WHERE t.accountid = @accountid
                     }
                 }
 
+                // Разделяем фактические значения на две серии: в пределах бюджета и с превышением
+                var normalValues = new List<double>();
+                var overspendValues = new List<double>();
+                var overspendCategories = new List<(string Name, double Actual, double Budget)>();
+
+                for (int i = 0; i < categoryNames.Count; i++)
+                {
+                    if (actualValues[i] > budgetValues[i])
+                    {
+                        // Превышение — красная серия показывает значение, нормальная — 0
+                        overspendValues.Add(actualValues[i]);
+                        normalValues.Add(0);
+                        overspendCategories.Add((categoryNames[i], actualValues[i], budgetValues[i]));
+                    }
+                    else
+                    {
+                        // В пределах бюджета — нормальная серия показывает значение, красная — 0
+                        normalValues.Add(actualValues[i]);
+                        overspendValues.Add(0);
+                    }
+                }
+
                 BudgetComparisonChart.Series = new SeriesCollection
                 {
                     new ColumnSeries
                     {
                         Title = "Факт (расходы)",
-                        Values = new ChartValues<double>(actualValues),
+                        Values = new ChartValues<double>(normalValues),
                         DataLabels = true,
                         MaxColumnWidth = 40,
-                        LabelPoint = p => p.Y.ToString("N0")
+                        Fill = new SolidColorBrush(Color.FromRgb(0x33, 0x98, 0xDB)),
+                        LabelPoint = p => p.Y == 0 ? "" : p.Y.ToString("N0")
+                    },
+                    new ColumnSeries
+                    {
+                        Title = "Превышение",
+                        Values = new ChartValues<double>(overspendValues),
+                        DataLabels = true,
+                        MaxColumnWidth = 40,
+                        Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x00)),
+                        LabelPoint = p => p.Y == 0 ? "" : p.Y.ToString("N0")
                     },
                     new ColumnSeries
                     {
@@ -646,6 +678,21 @@ WHERE t.accountid = @accountid
                         LabelFormatter = v => v.ToString("N0")
                     }
                 };
+
+                // Показываем предупреждение о превышении бюджета
+                if (overspendCategories.Count > 0)
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine("Внимание! Превышение бюджета по следующим категориям:");
+                    sb.AppendLine();
+                    foreach (var item in overspendCategories)
+                    {
+                        double over = item.Actual - item.Budget;
+                        sb.AppendLine($"• {item.Name}: потрачено {item.Actual:N2} ₽ из {item.Budget:N2} ₽ (превышение на {over:N2} ₽)");
+                    }
+                    MessageBox.Show(sb.ToString(), "Превышение бюджета",
+                                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             }
             catch (Exception ex)
             {
