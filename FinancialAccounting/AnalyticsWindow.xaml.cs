@@ -663,7 +663,7 @@ WHERE t.accountid = @accountid
                 foreach (var msg in recent)
                 {
                     var label = msg.Role == "user" ? "Пользователь" : "Ассистент";
-                    var snippet = msg.Text.Length > 500 ? msg.Text[..500] + "…" : msg.Text;
+                    var snippet = msg.Text.Length > 500 ? msg.Text.Substring(0, 500) + "…" : msg.Text;
                     sb.AppendLine(string.Format("{0}: {1}", label, snippet));
                 }
                 sb.AppendLine();
