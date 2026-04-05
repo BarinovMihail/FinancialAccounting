@@ -13,6 +13,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Diagnostics;
 using System.Windows.Media;
 
 namespace FinancialAccounting
@@ -569,12 +570,11 @@ WHERE t.accountid = @accountid
                 string prompt = BuildAssistantContext(userText);
                 string response = await _mistralService.GetChatResponseAsync(prompt);
                 placeholder.Text = response;
-                RefreshChatDisplay();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Debug.WriteLine($"[SmartAssistant] Error: {ex}");
                 placeholder.Text = "Не удалось получить ответ от ассистента. Попробуйте ещё раз.";
-                RefreshChatDisplay();
             }
             finally
             {
@@ -583,13 +583,6 @@ WHERE t.accountid = @accountid
                 UserInputBox.Focus();
                 ScrollChatToBottom();
             }
-        }
-
-        private void RefreshChatDisplay()
-        {
-            var source = ChatMessages;
-            ChatItemsControl.ItemsSource = null;
-            ChatItemsControl.ItemsSource = source;
         }
 
         private void QuickPrompt_Click(object sender, RoutedEventArgs e)
@@ -621,13 +614,14 @@ WHERE t.accountid = @accountid
         {
             var sb = new StringBuilder();
 
-            // Section 1 — System role
+            // Section 1 — System role (wrapped with markers for MistralService)
+            sb.Append("|||SYSTEM|||");
             sb.AppendLine("Системная роль: Ты — финансовый аналитик-ассистент.");
             sb.AppendLine("Отвечай на русском языке.");
             sb.AppendLine("Давай короткие, практичные, конкретные рекомендации.");
             sb.AppendLine("Не придумывай данные, которых нет в предоставленных транзакциях.");
             sb.AppendLine("Основывай весь анализ на текущем отфильтрованном списке транзакций.");
-            sb.AppendLine();
+            sb.Append("|||USER|||");
 
             // Section 2 — Current analytics summary
             sb.AppendLine("=== Текущие данные ===");
@@ -669,7 +663,8 @@ WHERE t.accountid = @accountid
                 foreach (var msg in recent)
                 {
                     var label = msg.Role == "user" ? "Пользователь" : "Ассистент";
-                    sb.AppendLine(string.Format("{0}: {1}", label, msg.Text));
+                    var snippet = msg.Text.Length > 500 ? msg.Text[..500] + "…" : msg.Text;
+                    sb.AppendLine(string.Format("{0}: {1}", label, snippet));
                 }
                 sb.AppendLine();
             }

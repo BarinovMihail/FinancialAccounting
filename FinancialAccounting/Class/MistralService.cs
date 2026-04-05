@@ -46,15 +46,30 @@ namespace FinancialAccounting.Class
             return await SendChatRequestAsync(requestBody);
         }
 
-        public async Task<string> GetChatResponseAsync(string prompt)
+        public async Task<string> GetChatResponseAsync(string fullPrompt)
         {
+            string systemContent = "";
+            string userContent = fullPrompt;
+
+            const string sysMarker = "|||SYSTEM|||";
+            const string userMarker = "|||USER|||";
+
+            if (fullPrompt.StartsWith(sysMarker))
+            {
+                var parts = fullPrompt.Split(new[] { userMarker }, StringSplitOptions.None);
+                systemContent = parts[0].Replace(sysMarker, "").Trim();
+                userContent = parts.Length > 1 ? parts[1].Trim() : "";
+            }
+
+            var messages = new List<object>();
+            if (!string.IsNullOrEmpty(systemContent))
+                messages.Add(new { role = "system", content = systemContent });
+            messages.Add(new { role = "user", content = userContent });
+
             var requestBody = new
             {
                 model = "mistral-medium",
-                messages = new[]
-                {
-                    new { role = "user", content = prompt }
-                },
+                messages,
                 max_tokens = 2000,
                 temperature = 0.7
             };
