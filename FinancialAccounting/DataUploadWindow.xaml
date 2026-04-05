@@ -95,6 +95,7 @@
 
                 <!-- Кнопки действий (слева) -->
                 <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <Button Content="Распознать чек" Width="150" Height="40" Background="#2E8B57" Foreground="White" Margin="0,0,10,10" Click="UploadReceipt_Click"/>
                     <Button Content="Категоризация" Width="130" Height="40" Background="#8A2BE2" Foreground="White" Margin="0,0,10,10" Click="Categorize_Click"/>
                     <Button Content="Обработать" Width="120" Height="40" Background="#D2691E" Foreground="White" Margin="0,0,10,10" Click="Processing_Click"/>
                     <Button Content="Сохранить в БД" Width="150" Height="40" Background="#D2691E" Foreground="White" Margin="0,0,10,10" Click="SaveDatabase_Click"/>

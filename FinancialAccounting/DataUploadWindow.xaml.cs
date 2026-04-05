@@ -5,11 +5,15 @@ using FinancialAccounting.Class.Parsers;
 using Microsoft.Win32;
 using Npgsql;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Transactions;
@@ -29,6 +33,19 @@ namespace FinancialAccounting
         private readonly string _username;
         private string selectedFilePath;
         private readonly IMlApiClient _mlClient;
+        private static readonly string[] ReceiptOcrLanguages = { "rus", "eng" };
+        private static readonly string[] SupportedReceiptExtensions = { ".jpg", ".jpeg", ".png" };
+        private const string ReceiptCategoryName = "Супермаркеты";
+        private static readonly string[] ReceiptSummaryTokens =
+        {
+            "ИТОГ", "ИТОГО", "ВСЕГО", "СУММА", "СКИДКА", "СДАЧА", "НАЛИЧНЫМИ", "БЕЗНАЛИЧНЫМИ", "БЕЗНАЛ", "ПОЛУЧЕНО", "ПРИНЯТО", "ПОДЫТОГ"
+        };
+        private static readonly string[] ReceiptServiceTokens =
+        {
+            "ИНН", "ККТ", "ФН", "ФД", "ФП", "САЙТ ФНС", "NALOG.RU", "WWW.", "QR", "КАССИР", "КАССА", "СМЕНА",
+            "ЧЕК:", "ЧЕК ", "ПРИХОД", "МЕСТО РАСЧЕТОВ", "АДРЕС", "КОД:", "ПРОДАВЕЦ", "СНО:", "РН ККТ", "ЗН ККТ",
+            "ОФД", "СПАСИБО", "ГОРЯЧАЯ ЛИНИЯ", "ПОЛУЧИТЕ", "ПОДРОБНОСТИ", "МАГНИТИКИ", "СКРЕПЫШИ", "ШТРИХКОД"
+        };
 
         // Коллекция для привязки к DataGrid
         private ObservableCollection<TransactionRecord> _transactions =
@@ -115,6 +132,52 @@ namespace FinancialAccounting
             TransactionsGrid.ItemsSource = _transactions;
 
             if (btnTrainModel != null) btnTrainModel.Visibility = Visibility.Collapsed;
+        }
+
+        private async void UploadReceipt_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog
+            {
+                Filter = "Изображения чеков|*.jpg;*.jpeg;*.png",
+                Title = "Выберите изображение чека"
+            };
+
+            if (openFileDialog.ShowDialog() != true)
+            {
+                return;
+            }
+
+            var receiptPath = openFileDialog.FileName;
+            txtFileName.Text = Path.GetFileName(receiptPath);
+
+            try
+            {
+                SetBusyState("Распознавание чека...", 15);
+                var parseResult = await RecognizeReceiptAsync(receiptPath);
+                AppendReceiptToTransactions(parseResult);
+
+                ProgressBar.Value = 100;
+                ProgressText.Text = "Чек успешно распознан.";
+                await Task.Delay(400);
+
+                MessageBox.Show(
+                    $"Чек успешно распознан.\nДобавлено строк: {parseResult.Records.Count}.",
+                    "Успех",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Не удалось распознать чек: {ex.Message}",
+                    "Ошибка OCR",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                ResetBusyState();
+            }
         }
 
         private async void Processing_Click(object sender, RoutedEventArgs e)
@@ -618,6 +681,787 @@ namespace FinancialAccounting
             if (ozonScore > sberScore && ozonScore > tinkoffScore) return "Ozon";
 
             return "Unknown";
+        }
+
+        private async Task<ReceiptParseResult> RecognizeReceiptAsync(string receiptPath)
+        {
+            ValidateReceiptFile(receiptPath);
+
+            var mistralResult = await TryRecognizeReceiptWithMistralAsync(receiptPath);
+            if (mistralResult != null && mistralResult.Records.Count > 0)
+            {
+                return mistralResult;
+            }
+
+            string recognizedText = await RunReceiptOcrAsync(receiptPath);
+            if (string.IsNullOrWhiteSpace(recognizedText))
+            {
+                throw new InvalidOperationException("OCR не вернул текст для выбранного изображения.");
+            }
+
+            var parseResult = ParseReceiptText(recognizedText);
+            if (parseResult.Records.Count == 0)
+            {
+                throw new InvalidOperationException("Из текста чека не удалось извлечь позиции или итоговую сумму.");
+            }
+
+            return parseResult;
+        }
+
+        private async Task<ReceiptParseResult> TryRecognizeReceiptWithMistralAsync(string receiptPath)
+        {
+            try
+            {
+                var mistralService = new MistralService(new HttpClient());
+                var receipt = await mistralService.RecognizeReceiptAsync(receiptPath);
+                return MapMistralReceiptToParseResult(receipt);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Mistral receipt recognition failed: " + ex.Message);
+                return null;
+            }
+        }
+
+        private ReceiptParseResult MapMistralReceiptToParseResult(ReceiptRecognitionResult receipt)
+        {
+            if (receipt == null)
+            {
+                return null;
+            }
+
+            string purchaseDate = NormalizeReceiptDate(receipt.PurchaseDate);
+            string storeName = string.IsNullOrWhiteSpace(receipt.StoreName) ? "Чек" : receipt.StoreName.Trim();
+            decimal? totalAmount = receipt.TotalAmount > 0 ? receipt.TotalAmount : (decimal?)null;
+
+            var parseResult = new ReceiptParseResult
+            {
+                StoreName = storeName,
+                PurchaseDate = purchaseDate,
+                TotalAmount = totalAmount,
+                Records = new List<TransactionRecord>()
+            };
+
+            foreach (var item in receipt.Items ?? Enumerable.Empty<ReceiptRecognitionItem>())
+            {
+                if (item == null || item.Amount <= 0)
+                {
+                    continue;
+                }
+
+                string resolvedItemName = ResolveReceiptItemName(receipt, item, totalAmount);
+                if (string.IsNullOrWhiteSpace(resolvedItemName))
+                {
+                    continue;
+                }
+
+                parseResult.Records.Add(new TransactionRecord
+                {
+                    Date = purchaseDate,
+                    Category = ReceiptCategoryName,
+                    Amount = FormatExpenseAmount(item.Amount),
+                    Balance = string.Empty,
+                    Description = BuildReceiptDescription(storeName, resolvedItemName),
+                    Type = "Expense"
+                });
+            }
+
+            if (parseResult.Records.Count == 0 && totalAmount.HasValue)
+            {
+                parseResult.Records.Add(new TransactionRecord
+                {
+                    Date = purchaseDate,
+                    Category = ReceiptCategoryName,
+                    Amount = FormatExpenseAmount(totalAmount.Value),
+                    Balance = string.Empty,
+                    Description = BuildReceiptDescription(storeName, "Итог по чеку"),
+                    Type = "Expense"
+                });
+            }
+
+            return parseResult;
+        }
+
+        private string ResolveReceiptItemName(ReceiptRecognitionResult receipt, ReceiptRecognitionItem item, decimal? totalAmount)
+        {
+            string candidate = CleanupReceiptItemName(item.Name);
+            if (IsUsefulReceiptItemName(candidate))
+            {
+                return candidate;
+            }
+
+            var lines = GetReceiptItemSection(ExtractReceiptLinesFromMarkdown(receipt.RawMarkdown));
+            for (int i = 0; i < lines.Count; i++)
+            {
+                string line = lines[i];
+                if (!TryExtractAmountFromLine(line, out decimal lineAmount) || !AreAmountsClose(lineAmount, item.Amount))
+                {
+                    continue;
+                }
+
+                if (i > 0)
+                {
+                    string previousLineName = CleanupReceiptItemName(lines[i - 1]);
+                    if (IsUsefulReceiptItemName(previousLineName))
+                    {
+                        return previousLineName;
+                    }
+                }
+
+                if (i + 1 < lines.Count)
+                {
+                    string nextLineName = CleanupReceiptItemName(lines[i + 1]);
+                    if (IsUsefulReceiptItemName(nextLineName) && !TryExtractAmountFromLine(lines[i + 1], out decimal nextAmount))
+                    {
+                        return nextLineName;
+                    }
+                }
+
+                if (i > 1)
+                {
+                    string previousLineName = CleanupReceiptItemName(lines[i - 2]);
+                    if (IsUsefulReceiptItemName(previousLineName))
+                    {
+                        return previousLineName;
+                    }
+                }
+            }
+
+            foreach (var line in lines)
+            {
+                if (!TryExtractAmountFromLine(line, out decimal lineAmount) || !AreAmountsClose(lineAmount, item.Amount))
+                {
+                    continue;
+                }
+
+                string inlineName = CleanupReceiptNameFromAmountLine(line, item.Amount);
+                if (IsUsefulReceiptItemName(inlineName))
+                {
+                    return inlineName;
+                }
+            }
+
+            if (totalAmount.HasValue && AreAmountsClose(item.Amount, totalAmount.Value))
+            {
+                return "Итог по чеку";
+            }
+
+            return null;
+        }
+
+        private void ValidateReceiptFile(string receiptPath)
+        {
+            if (string.IsNullOrWhiteSpace(receiptPath) || !File.Exists(receiptPath))
+            {
+                throw new FileNotFoundException("Файл чека не найден.");
+            }
+
+            string extension = Path.GetExtension(receiptPath)?.ToLowerInvariant();
+            if (!SupportedReceiptExtensions.Contains(extension))
+            {
+                throw new InvalidOperationException("Поддерживаются только изображения в форматах JPG, JPEG и PNG.");
+            }
+        }
+
+        private async Task<string> RunReceiptOcrAsync(string receiptPath)
+        {
+            string tesseractPath = ResolveTesseractExecutablePath();
+            if (string.IsNullOrWhiteSpace(tesseractPath))
+            {
+                throw new InvalidOperationException(
+                    "Не найден Tesseract OCR. Установите Tesseract и языковые пакеты rus/eng, либо положите tesseract.exe рядом с приложением.");
+            }
+
+            string tempBasePath = Path.Combine(Path.GetTempPath(), "finacc_receipt_" + Guid.NewGuid().ToString("N"));
+            string arguments = string.Format(
+                CultureInfo.InvariantCulture,
+                "\"{0}\" \"{1}\" -l {2} --psm 6",
+                receiptPath,
+                tempBasePath,
+                string.Join("+", ReceiptOcrLanguages));
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = tesseractPath,
+                Arguments = arguments,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                StandardErrorEncoding = Encoding.UTF8,
+                StandardOutputEncoding = Encoding.UTF8
+            };
+
+            using (var process = new Process { StartInfo = startInfo })
+            {
+                process.Start();
+                string standardOutput = await process.StandardOutput.ReadToEndAsync();
+                string standardError = await process.StandardError.ReadToEndAsync();
+                await Task.Run(() => process.WaitForExit());
+
+                if (process.ExitCode != 0)
+                {
+                    throw new InvalidOperationException(string.IsNullOrWhiteSpace(standardError) ? standardOutput : standardError);
+                }
+            }
+
+            string outputFile = tempBasePath + ".txt";
+            try
+            {
+                return File.Exists(outputFile) ? File.ReadAllText(outputFile, Encoding.UTF8) : string.Empty;
+            }
+            finally
+            {
+                if (File.Exists(outputFile))
+                {
+                    File.Delete(outputFile);
+                }
+            }
+        }
+
+        private string ResolveTesseractExecutablePath()
+        {
+            var candidates = new List<string>
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tesseract.exe"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tesseract", "tesseract.exe"),
+                @"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                @"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"
+            };
+
+            string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+            foreach (var pathPart in pathEnv.Split(new[] { Path.PathSeparator }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                try
+                {
+                    candidates.Add(Path.Combine(pathPart.Trim(), "tesseract.exe"));
+                }
+                catch
+                {
+                    // Пропускаем некорректные пути из PATH.
+                }
+            }
+
+            return candidates.FirstOrDefault(File.Exists);
+        }
+
+        private ReceiptParseResult ParseReceiptText(string rawText)
+        {
+            var lines = rawText
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(NormalizeReceiptLine)
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToList();
+
+            var itemSectionLines = GetReceiptItemSection(lines);
+            var result = new ReceiptParseResult
+            {
+                StoreName = ExtractStoreName(lines),
+                PurchaseDate = ExtractReceiptDate(lines),
+                TotalAmount = ExtractTotalAmount(lines),
+                Records = new List<TransactionRecord>()
+            };
+
+            var itemCandidates = ExtractReceiptItems(itemSectionLines, result.TotalAmount);
+            foreach (var item in itemCandidates)
+            {
+                result.Records.Add(new TransactionRecord
+                {
+                    Date = result.PurchaseDate,
+                    Category = ReceiptCategoryName,
+                    Amount = FormatExpenseAmount(item.Amount),
+                    Balance = string.Empty,
+                    Description = BuildReceiptDescription(result.StoreName, item.Name),
+                    Type = "Expense"
+                });
+            }
+
+            if (result.Records.Count == 0 && result.TotalAmount.HasValue)
+            {
+                result.Records.Add(new TransactionRecord
+                {
+                    Date = result.PurchaseDate,
+                    Category = ReceiptCategoryName,
+                    Amount = FormatExpenseAmount(result.TotalAmount.Value),
+                    Balance = string.Empty,
+                    Description = BuildReceiptDescription(result.StoreName, "Итог по чеку"),
+                    Type = "Expense"
+                });
+            }
+
+            return result;
+        }
+
+        private List<string> GetReceiptItemSection(List<string> lines)
+        {
+            if (lines == null || lines.Count == 0)
+            {
+                return new List<string>();
+            }
+
+            int startIndex = 0;
+            int headerIndex = lines.FindIndex(line =>
+                line.IndexOf("КОЛ-ВО", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                line.IndexOf("ИТОГО", StringComparison.OrdinalIgnoreCase) >= 0 && line.IndexOf("ЦЕНА", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            if (headerIndex >= 0)
+            {
+                startIndex = headerIndex + 1;
+            }
+
+            int barcodeIndex = lines.FindIndex(line => Regex.IsMatch(line, @"^[\|\!Il1]{20,}$"));
+            if (barcodeIndex >= 0 && barcodeIndex + 1 > startIndex)
+            {
+                startIndex = barcodeIndex + 1;
+            }
+
+            int endIndex = lines.FindIndex(startIndex, line => IsReceiptSummaryLine(line));
+            if (endIndex < 0)
+            {
+                endIndex = lines.Count;
+            }
+
+            return lines.Skip(startIndex).Take(endIndex - startIndex).ToList();
+        }
+
+        private List<ReceiptItem> ExtractReceiptItems(List<string> lines, decimal? totalAmount)
+        {
+            var items = new List<ReceiptItem>();
+            int index = 0;
+
+            while (index < lines.Count)
+            {
+                string line = lines[index];
+                if (ShouldSkipReceiptLine(line))
+                {
+                    index++;
+                    continue;
+                }
+
+                if (TryParseInlineReceiptItem(line, totalAmount, out ReceiptItem inlineItem))
+                {
+                    items.Add(inlineItem);
+                    index++;
+                    continue;
+                }
+
+                if (index + 1 < lines.Count &&
+                    TryParseSplitReceiptItem(line, lines[index + 1], totalAmount, out ReceiptItem splitItem))
+                {
+                    items.Add(splitItem);
+                    index += 2;
+                    continue;
+                }
+
+                index++;
+            }
+
+            return items;
+        }
+
+        private bool TryParseInlineReceiptItem(string line, decimal? totalAmount, out ReceiptItem item)
+        {
+            item = null;
+            if (!TryExtractAmountFromLine(line, out decimal amount) || !IsValidReceiptAmount(amount, totalAmount))
+            {
+                return false;
+            }
+
+            string amountToken = ExtractLastAmountToken(line);
+            if (string.IsNullOrWhiteSpace(amountToken))
+            {
+                return false;
+            }
+
+            string name = line.Substring(0, line.LastIndexOf(amountToken, StringComparison.Ordinal)).Trim(' ', '.', '-', ':', ';');
+            name = Regex.Replace(name, @"\b\d+[xх*]\d+([,\.]\d+)?\b", string.Empty, RegexOptions.IgnoreCase);
+            name = Regex.Replace(name, @"\b\d+([,\.]\d+)?\s?(кг|г|л|мл|шт)\b", string.Empty, RegexOptions.IgnoreCase);
+            name = Regex.Replace(name, @"\b\d+([,\.]\d{1,3})?\b", string.Empty, RegexOptions.IgnoreCase);
+            name = Regex.Replace(name, @"\s{2,}", " ").Trim();
+            name = CleanupReceiptItemName(name);
+
+            if (string.IsNullOrWhiteSpace(name) || name.Length < 2)
+            {
+                return false;
+            }
+
+            item = new ReceiptItem
+            {
+                Name = name,
+                Amount = amount
+            };
+
+            return true;
+        }
+
+        private bool TryParseSplitReceiptItem(string nameLine, string amountLine, decimal? totalAmount, out ReceiptItem item)
+        {
+            item = null;
+            if (ShouldSkipReceiptLine(nameLine) || ShouldSkipReceiptLine(amountLine))
+            {
+                return false;
+            }
+
+            string cleanedName = CleanupReceiptItemName(nameLine);
+            if (string.IsNullOrWhiteSpace(cleanedName) || !ContainsLetters(cleanedName) || cleanedName.StartsWith("НДС", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var amountMatches = Regex.Matches(amountLine, @"\d+[.,]\d{2,3}");
+            if (amountMatches.Count == 0)
+            {
+                return false;
+            }
+
+            string totalToken = amountMatches[amountMatches.Count - 1].Value;
+            if (!TryParseReceiptDecimal(totalToken, out decimal total) || !IsValidReceiptAmount(total, totalAmount))
+            {
+                return false;
+            }
+
+            item = new ReceiptItem
+            {
+                Name = cleanedName,
+                Amount = total
+            };
+
+            return true;
+        }
+
+        private bool TryExtractAmountFromLine(string line, out decimal amount)
+        {
+            amount = 0;
+            string token = ExtractLastAmountToken(line);
+            return !string.IsNullOrWhiteSpace(token) && TryParseReceiptDecimal(token, out amount);
+        }
+
+        private string ExtractLastAmountToken(string line)
+        {
+            var matches = Regex.Matches(line, @"(?<!\d)(\d{1,3}(?:[ \.,]\d{3})*[.,]\d{2}|\d+)(?!\d)");
+            if (matches.Count == 0)
+            {
+                return null;
+            }
+
+            return matches[matches.Count - 1].Value;
+        }
+
+        private string ExtractStoreName(List<string> lines)
+        {
+            return lines.FirstOrDefault(line =>
+                line.Length >= 3 &&
+                ContainsLetters(line) &&
+                !line.Any(char.IsDigit) &&
+                !ShouldSkipReceiptLine(line) &&
+                line.IndexOf("КАССОВЫЙ ЧЕК", StringComparison.OrdinalIgnoreCase) < 0)
+                ?? "Чек";
+        }
+
+        private string ExtractReceiptDate(List<string> lines)
+        {
+            var dateMatch = lines
+                .Select(line => Regex.Match(line, @"(?<date>\d{1,2}[./-]\d{1,2}[./-]\d{2,4})(?:\s+(?<time>\d{1,2}:\d{2}(?::\d{2})?))?"))
+                .FirstOrDefault(match => match.Success);
+
+            if (dateMatch != null && dateMatch.Success)
+            {
+                string dateValue = dateMatch.Groups["date"].Value.Replace('-', '.').Replace('/', '.');
+                string[] formats = { "dd.MM.yyyy", "d.M.yyyy", "dd.MM.yy", "d.M.yy" };
+
+                if (DateTime.TryParseExact(dateValue, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
+                {
+                    return parsedDate.ToString("dd.MM.yyyy");
+                }
+            }
+
+            return DateTime.Now.ToString("dd.MM.yyyy");
+        }
+
+        private string NormalizeReceiptDate(string rawDate)
+        {
+            if (string.IsNullOrWhiteSpace(rawDate))
+            {
+                return DateTime.Now.ToString("dd.MM.yyyy");
+            }
+
+            string normalized = rawDate.Trim().Replace('-', '.').Replace('/', '.');
+            string[] formats =
+            {
+                "dd.MM.yyyy", "d.M.yyyy", "dd.MM.yy", "d.M.yy",
+                "yyyy.MM.dd", "yyyy.M.d", "yyyy-MM-dd", "yyyy/MM/dd"
+            };
+
+            if (DateTime.TryParseExact(normalized, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
+            {
+                return parsedDate.ToString("dd.MM.yyyy");
+            }
+
+            if (DateTime.TryParse(normalized, out parsedDate))
+            {
+                return parsedDate.ToString("dd.MM.yyyy");
+            }
+
+            return DateTime.Now.ToString("dd.MM.yyyy");
+        }
+
+        private decimal? ExtractTotalAmount(List<string> lines)
+        {
+            var totalLine = lines.LastOrDefault(line =>
+                line.IndexOf("ИТОГ", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                line.IndexOf("ИТОГО", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                line.IndexOf("ВСЕГО", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                line.IndexOf("ПОДЫТОГ", StringComparison.OrdinalIgnoreCase) >= 0);
+
+            if (!string.IsNullOrWhiteSpace(totalLine) && TryExtractAmountFromLine(totalLine, out decimal totalAmount))
+            {
+                return totalAmount;
+            }
+
+            var fallbackAmounts = lines
+                .Where(line => TryExtractAmountFromLine(line, out _))
+                .Select(line =>
+                {
+                    TryExtractAmountFromLine(line, out decimal value);
+                    return value;
+                })
+                .Where(value => value > 0)
+                .ToList();
+
+            return fallbackAmounts.Count > 0 ? fallbackAmounts.Max() : (decimal?)null;
+        }
+
+        private bool IsReceiptSummaryLine(string line)
+        {
+            return ReceiptSummaryTokens.Any(token => line.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private string NormalizeReceiptLine(string line)
+        {
+            string normalized = (line ?? string.Empty).Trim();
+            normalized = normalized.Replace('\t', ' ');
+            normalized = normalized.Replace("|", " ");
+            normalized = normalized.Replace("’", "'");
+            normalized = normalized.Replace("`", "'");
+            normalized = Regex.Replace(normalized, @"\s{2,}", " ");
+            return normalized.Trim();
+        }
+
+        private bool TryParseReceiptDecimal(string value, out decimal amount)
+        {
+            amount = 0;
+            string normalized = (value ?? string.Empty).Trim().Replace(" ", string.Empty);
+
+            int lastComma = normalized.LastIndexOf(',');
+            int lastDot = normalized.LastIndexOf('.');
+            int separatorIndex = Math.Max(lastComma, lastDot);
+
+            if (separatorIndex >= 0)
+            {
+                string integerPart = Regex.Replace(normalized.Substring(0, separatorIndex), @"[^\d-]", string.Empty);
+                string fractionPart = Regex.Replace(normalized.Substring(separatorIndex + 1), @"[^\d]", string.Empty);
+                normalized = integerPart + "." + fractionPart;
+            }
+            else
+            {
+                normalized = Regex.Replace(normalized, @"[^\d-]", string.Empty);
+            }
+
+            return decimal.TryParse(normalized, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out amount);
+        }
+
+        private string FormatExpenseAmount(decimal amount)
+        {
+            return (-Math.Abs(amount)).ToString("N2", new CultureInfo("ru-RU"));
+        }
+
+        private string BuildReceiptDescription(string storeName, string itemName)
+        {
+            if (string.IsNullOrWhiteSpace(storeName))
+            {
+                return itemName;
+            }
+
+            if (string.IsNullOrWhiteSpace(itemName))
+            {
+                return storeName;
+            }
+
+            return storeName + ": " + itemName;
+        }
+
+        private List<string> ExtractReceiptLinesFromMarkdown(string markdown)
+        {
+            return (markdown ?? string.Empty)
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(NormalizeReceiptLine)
+                .Select(line => Regex.Replace(line, @"[*_`#>\-\[\]\(\)\|]+", " ").Trim())
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToList();
+        }
+
+        private string CleanupReceiptNameFromAmountLine(string line, decimal amount)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return null;
+            }
+
+            string amountPattern = Regex.Escape(amount.ToString("0.00", CultureInfo.InvariantCulture)).Replace("\\.", "[\\.,]");
+            var amountMatch = Regex.Match(line, amountPattern);
+            string namePart = amountMatch.Success
+                ? line.Substring(0, amountMatch.Index)
+                : line;
+
+            if (!ContainsLetters(namePart))
+            {
+                return null;
+            }
+
+            namePart = Regex.Replace(namePart, @"\b\d+[xх*]\d+([,\.]\d+)?\b", string.Empty, RegexOptions.IgnoreCase);
+            namePart = Regex.Replace(namePart, @"\b\d+([,\.]\d+)?\s?(кг|г|л|мл|шт|уп|упк)\b", string.Empty, RegexOptions.IgnoreCase);
+            namePart = Regex.Replace(namePart, @"\b\d+([,\.]\d{1,3})?\b", string.Empty, RegexOptions.IgnoreCase);
+            return CleanupReceiptItemName(namePart);
+        }
+
+        private bool IsUsefulReceiptItemName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            string cleaned = CleanupReceiptItemName(value);
+            if (cleaned.Length < 3 || !ContainsLetters(cleaned))
+            {
+                return false;
+            }
+
+            if (ShouldSkipReceiptLine(cleaned))
+            {
+                return false;
+            }
+
+            if (Regex.IsMatch(cleaned, @"^\d+$"))
+            {
+                return false;
+            }
+
+            int letterCount = cleaned.Count(char.IsLetter);
+            int digitCount = cleaned.Count(char.IsDigit);
+            if (digitCount > letterCount)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool AreAmountsClose(decimal left, decimal right)
+        {
+            return Math.Abs(left - right) <= 0.02m;
+        }
+
+        private bool ShouldSkipReceiptLine(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return true;
+            }
+
+            if (IsReceiptSummaryLine(line))
+            {
+                return true;
+            }
+
+            if (ReceiptServiceTokens.Any(token => line.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return true;
+            }
+
+            if (Regex.IsMatch(line, @"^[\d\W_]+$"))
+            {
+                return true;
+            }
+
+            if (line.StartsWith("НДС", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool IsValidReceiptAmount(decimal amount, decimal? totalAmount)
+        {
+            if (amount <= 0 || amount > 1000000m)
+            {
+                return false;
+            }
+
+            if (totalAmount.HasValue && totalAmount.Value > 0 && amount > totalAmount.Value * 1.2m)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private string CleanupReceiptItemName(string name)
+        {
+            string cleaned = (name ?? string.Empty).Trim();
+            cleaned = Regex.Replace(cleaned, @"^[\*\#\@\+\-]+", string.Empty);
+            cleaned = Regex.Replace(cleaned, @"\b(цена|скидка|кол-во|итого|кассовый чек)\b", string.Empty, RegexOptions.IgnoreCase);
+            cleaned = Regex.Replace(cleaned, @"\s{2,}", " ").Trim(' ', '.', ',', ';', ':', '-', '*');
+            return cleaned;
+        }
+
+        private bool ContainsLetters(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value) && value.Any(char.IsLetter);
+        }
+
+        private void AppendReceiptToTransactions(ReceiptParseResult parseResult)
+        {
+            if (_transactions == null)
+            {
+                _transactions = new ObservableCollection<TransactionRecord>();
+            }
+
+            foreach (var record in parseResult.Records)
+            {
+                _transactions.Add(record);
+            }
+
+            TransactionsGrid.ItemsSource = _transactions;
+        }
+
+        private void SetBusyState(string progressText, double progressValue)
+        {
+            ProgressBar.Visibility = Visibility.Visible;
+            ProgressBar.Value = progressValue;
+            ProgressText.Text = progressText;
+        }
+
+        private void ResetBusyState()
+        {
+            ProgressBar.Visibility = Visibility.Collapsed;
+            ProgressBar.Value = 0;
+            ProgressText.Text = string.Empty;
+        }
+
+        private sealed class ReceiptParseResult
+        {
+            public string StoreName { get; set; }
+            public string PurchaseDate { get; set; }
+            public decimal? TotalAmount { get; set; }
+            public List<TransactionRecord> Records { get; set; }
+        }
+
+        private sealed class ReceiptItem
+        {
+            public string Name { get; set; }
+            public decimal Amount { get; set; }
         }
     }
 }
