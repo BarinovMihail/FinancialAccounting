@@ -116,6 +116,44 @@ namespace FinancialAccounting
             }
         }
 
+        private void DeleteBudget_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedBudget = BudgetListView.SelectedItem as BudgetDisplayItem;
+            if (selectedBudget == null)
+            {
+                MessageBox.Show("Выберите бюджет для удаления.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"Вы уверены, что хотите удалить бюджет для категории '{selectedBudget.CategoryName}'?",
+                "Подтверждение удаления",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                using (var dbManager = new DatabaseManager())
+                {
+                    var connection = dbManager.GetOpenConnection();
+                    using (var command = new NpgsqlCommand("DELETE FROM category_budgets WHERE id = @id", connection))
+                    {
+                        command.Parameters.AddWithValue("@id", selectedBudget.Id);
+                        command.ExecuteNonQuery();
+                    }
+                }
+
+                LoadBudgets();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при удалении бюджета:\n" + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             Close();
