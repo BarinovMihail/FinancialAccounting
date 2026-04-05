@@ -282,6 +282,9 @@
     <Compile Include="AnalyticsWindow.xaml.cs">
       <DependentUpon>AnalyticsWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="BudgetManagementWindow.xaml.cs">
+      <DependentUpon>BudgetManagementWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Class\EmailService .cs" />
     <Compile Include="Class\IEmailService.cs" />
     <Compile Include="Class\IMlApiClient.cs" />
@@ -318,6 +321,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="BudgetManagementWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="DataUploadWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -341,6 +348,7 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Class\CategoryBudget.cs" />
     <Compile Include="Class\DatabaseManager.cs" />
     <Compile Include="DataUploadWindow.xaml.cs">
       <DependentUpon>DataUploadWindow.xaml</DependentUpon>
@@ -393,6 +401,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="Migrations\add_category_budgets.sql" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="finance_icon.ico" />

@@ -80,7 +80,7 @@
         </Border>
 
         <!-- Вкладки -->
-        <TabControl Grid.Row="2" Margin="0,10,0,0">
+        <TabControl Grid.Row="2" Margin="0,10,0,0" SelectionChanged="TabControl_SelectionChanged">
             <!-- Вкладка 1: графики + анализ -->
             <TabItem Header="Графики и анализ">
                 <Grid Margin="0,8,0,0">
@@ -259,6 +259,56 @@
                             </Grid>
                         </Border>
                     </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- Вкладка 3: бюджеты по категориям -->
+            <TabItem Header="БЮДЖЕТЫ ПО КАТЕГОРИЯМ">
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Button Grid.Row="0"
+                            Content="Управление бюджетами"
+                            Width="200" Height="34"
+                            HorizontalAlignment="Left"
+                            Background="#FF9800"
+                            Foreground="White"
+                            BorderThickness="0"
+                            FontWeight="SemiBold"
+                            Margin="0,0,0,10"
+                            Click="OpenBudgetManagement_Click"/>
+
+                    <Border Grid.Row="1"
+                            Background="White"
+                            BorderBrush="#FFE0B2"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="10">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Text="Сравнение расходов и бюджетов по категориям"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Foreground="#C76A00"
+                                       Margin="0,0,0,8"/>
+
+                            <lvc:CartesianChart Grid.Row="1"
+                                                x:Name="BudgetComparisonChart"
+                                                MinHeight="300">
+                                <lvc:CartesianChart.DataTooltip>
+                                    <lvc:DefaultTooltip SelectionMode="OnlySender" />
+                                </lvc:CartesianChart.DataTooltip>
+                            </lvc:CartesianChart>
+                        </Grid>
+                    </Border>
                 </Grid>
             </TabItem>
 

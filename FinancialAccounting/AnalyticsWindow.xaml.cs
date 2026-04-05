@@ -552,6 +552,108 @@ WHERE t.accountid = @accountid
             }
         }
 
+        private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.Source is TabControl tabControl)
+            {
+                var selectedTab = tabControl.SelectedItem as TabItem;
+                if (selectedTab != null && selectedTab.Header?.ToString() == "БЮДЖЕТЫ ПО КАТЕГОРИЯМ")
+                {
+                    LoadBudgetTab();
+                }
+            }
+        }
+
+        private void OpenBudgetManagement_Click(object sender, RoutedEventArgs e)
+        {
+            var win = new BudgetManagementWindow();
+            win.Owner = this;
+            win.ShowDialog();
+            LoadBudgetTab();
+        }
+
+        private void LoadBudgetTab()
+        {
+            try
+            {
+                var categoryNames = new List<string>();
+                var actualValues = new List<double>();
+                var budgetValues = new List<double>();
+
+                using (var dbManager = new DatabaseManager())
+                {
+                    var connection = dbManager.GetOpenConnection();
+                    using (var command = new NpgsqlCommand(
+                        @"SELECT c.name,
+                                 COALESCE(ABS(SUM(t.amount)), 0) AS actual_expense,
+                                 cb.amount AS budget_amount
+                          FROM category_budgets cb
+                          JOIN categories c ON cb.category_id = c.id
+                          LEFT JOIN transactions t ON t.categoryid = c.id
+                                                   AND t.accountid = @accountId
+                                                   AND t.type = 'Expense'::transaction_type
+                          GROUP BY c.name, cb.amount
+                          ORDER BY c.name", connection))
+                    {
+                        command.Parameters.AddWithValue("@accountId", _accountId);
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                categoryNames.Add(reader.GetString(0));
+                                actualValues.Add(reader.IsDBNull(1) ? 0 : (double)reader.GetDecimal(1));
+                                budgetValues.Add((double)reader.GetDecimal(2));
+                            }
+                        }
+                    }
+                }
+
+                BudgetComparisonChart.Series = new SeriesCollection
+                {
+                    new ColumnSeries
+                    {
+                        Title = "Факт (расходы)",
+                        Values = new ChartValues<double>(actualValues),
+                        DataLabels = true,
+                        MaxColumnWidth = 40,
+                        LabelPoint = p => p.Y.ToString("N0")
+                    },
+                    new ColumnSeries
+                    {
+                        Title = "Бюджет",
+                        Values = new ChartValues<double>(budgetValues),
+                        DataLabels = true,
+                        MaxColumnWidth = 40,
+                        LabelPoint = p => p.Y.ToString("N0")
+                    }
+                };
+
+                BudgetComparisonChart.AxisX = new AxesCollection
+                {
+                    new Axis
+                    {
+                        Labels = categoryNames.ToArray(),
+                        LabelsRotation = 15
+                    }
+                };
+
+                BudgetComparisonChart.AxisY = new AxesCollection
+                {
+                    new Axis
+                    {
+                        Title = "Сумма",
+                        LabelFormatter = v => v.ToString("N0")
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка загрузки данных бюджета:\n" + ex.Message,
+                                "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
         private void BackButton_Click(object sender, RoutedEventArgs e)
         {
             Close();
