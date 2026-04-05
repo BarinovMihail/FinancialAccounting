@@ -552,6 +552,155 @@ WHERE t.accountid = @accountid
             }
         }
 
+        private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.Source is TabControl tabControl)
+            {
+                var selectedTab = tabControl.SelectedItem as TabItem;
+                if (selectedTab != null && selectedTab.Header?.ToString() == "БЮДЖЕТЫ ПО КАТЕГОРИЯМ")
+                {
+                    LoadBudgetTab();
+                }
+            }
+        }
+
+        private void OpenBudgetManagement_Click(object sender, RoutedEventArgs e)
+        {
+            var win = new BudgetManagementWindow();
+            win.Owner = this;
+            win.ShowDialog();
+            LoadBudgetTab();
+        }
+
+        private void LoadBudgetTab()
+        {
+            try
+            {
+                var categoryNames = new List<string>();
+                var actualValues = new List<double>();
+                var budgetValues = new List<double>();
+
+                using (var dbManager = new DatabaseManager())
+                {
+                    var connection = dbManager.GetOpenConnection();
+                    using (var command = new NpgsqlCommand(
+                        @"SELECT c.name,
+                                 COALESCE(ABS(SUM(t.amount)), 0) AS actual_expense,
+                                 cb.amount AS budget_amount
+                          FROM category_budgets cb
+                          JOIN categories c ON cb.category_id = c.id
+                          LEFT JOIN transactions t ON t.categoryid = c.id
+                                                   AND t.accountid = @accountId
+                                                   AND t.type = 'Expense'::transaction_type
+                          GROUP BY c.name, cb.amount
+                          ORDER BY c.name", connection))
+                    {
+                        command.Parameters.AddWithValue("@accountId", _accountId);
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                categoryNames.Add(reader.GetString(0));
+                                actualValues.Add(reader.IsDBNull(1) ? 0 : (double)reader.GetDecimal(1));
+                                budgetValues.Add((double)reader.GetDecimal(2));
+                            }
+                        }
+                    }
+                }
+
+                // Разделяем фактические значения на две серии: в пределах бюджета и с превышением
+                var normalValues = new List<double>();
+                var overspendValues = new List<double>();
+                var overspendCategories = new List<(string Name, double Actual, double Budget)>();
+
+                for (int i = 0; i < categoryNames.Count; i++)
+                {
+                    if (actualValues[i] > budgetValues[i])
+                    {
+                        // Превышение — красная серия показывает значение, нормальная — 0
+                        overspendValues.Add(actualValues[i]);
+                        normalValues.Add(0);
+                        overspendCategories.Add((categoryNames[i], actualValues[i], budgetValues[i]));
+                    }
+                    else
+                    {
+                        // В пределах бюджета — нормальная серия показывает значение, красная — 0
+                        normalValues.Add(actualValues[i]);
+                        overspendValues.Add(0);
+                    }
+                }
+
+                BudgetComparisonChart.Series = new SeriesCollection
+                {
+                    new ColumnSeries
+                    {
+                        Title = "Факт (расходы)",
+                        Values = new ChartValues<double>(normalValues),
+                        DataLabels = true,
+                        MaxColumnWidth = 40,
+                        Fill = new SolidColorBrush(Color.FromRgb(0x33, 0x98, 0xDB)),
+                        LabelPoint = p => p.Y == 0 ? "" : p.Y.ToString("N0")
+                    },
+                    new ColumnSeries
+                    {
+                        Title = "Превышение",
+                        Values = new ChartValues<double>(overspendValues),
+                        DataLabels = true,
+                        MaxColumnWidth = 40,
+                        Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x00)),
+                        LabelPoint = p => p.Y == 0 ? "" : p.Y.ToString("N0")
+                    },
+                    new ColumnSeries
+                    {
+                        Title = "Бюджет",
+                        Values = new ChartValues<double>(budgetValues),
+                        DataLabels = true,
+                        MaxColumnWidth = 40,
+                        LabelPoint = p => p.Y.ToString("N0")
+                    }
+                };
+
+                BudgetComparisonChart.AxisX = new AxesCollection
+                {
+                    new Axis
+                    {
+                        Labels = categoryNames.ToArray(),
+                        LabelsRotation = 15
+                    }
+                };
+
+                BudgetComparisonChart.AxisY = new AxesCollection
+                {
+                    new Axis
+                    {
+                        Title = "Сумма",
+                        LabelFormatter = v => v.ToString("N0")
+                    }
+                };
+
+                // Показываем предупреждение о превышении бюджета
+                if (overspendCategories.Count > 0)
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine("Внимание! Превышение бюджета по следующим категориям:");
+                    sb.AppendLine();
+                    foreach (var item in overspendCategories)
+                    {
+                        double over = item.Actual - item.Budget;
+                        sb.AppendLine($"• {item.Name}: потрачено {item.Actual:N2} ₽ из {item.Budget:N2} ₽ (превышение на {over:N2} ₽)");
+                    }
+                    MessageBox.Show(sb.ToString(), "Превышение бюджета",
+                                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка загрузки данных бюджета:\n" + ex.Message,
+                                "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
         private void BackButton_Click(object sender, RoutedEventArgs e)
         {
             Close();
