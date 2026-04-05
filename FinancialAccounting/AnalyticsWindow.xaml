@@ -111,7 +111,7 @@
                         </Grid>
                     </Border>
 
-                    <!-- Анализ -->
+                    <!-- Умные рекомендации — AI-ассистент -->
                     <Border Grid.Row="1"
                             Background="#FAFAFA"
                             BorderBrush="#FFE0B2"
@@ -122,45 +122,128 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0"
-                                       Text="Анализ данных"
+                                       Text="Умные рекомендации"
                                        FontSize="16"
                                        FontWeight="Bold"
                                        Foreground="#C76A00"
-                                       Margin="0,0,0,8"/>
+                                       Margin="0,0,0,6"/>
 
-                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                                <TextBlock x:Name="NeuroAnalysisText"
-                                           TextWrapping="Wrap"
-                                           LineHeight="20"
-                                           Text="Анализ данных будет отображён здесь..." />
+                            <!-- Быстрые вопросы -->
+                            <WrapPanel Grid.Row="1" Margin="0,0,0,8">
+                                <Button Content="На что я трачу больше всего?"
+                                        Margin="0,0,6,4" Padding="8,4"
+                                        Background="#FFE0B2" BorderThickness="0"
+                                        FontSize="12" Click="QuickPrompt_Click"/>
+                                <Button Content="Как сократить расходы?"
+                                        Margin="0,0,6,4" Padding="8,4"
+                                        Background="#FFE0B2" BorderThickness="0"
+                                        FontSize="12" Click="QuickPrompt_Click"/>
+                                <Button Content="Есть ли аномальные траты?"
+                                        Margin="0,0,6,4" Padding="8,4"
+                                        Background="#FFE0B2" BorderThickness="0"
+                                        FontSize="12" Click="QuickPrompt_Click"/>
+                                <Button Content="Какие категории самые затратные?"
+                                        Margin="0,0,6,4" Padding="8,4"
+                                        Background="#FFE0B2" BorderThickness="0"
+                                        FontSize="12" Click="QuickPrompt_Click"/>
+                                <Button Content="Дай рекомендации по бюджету"
+                                        Margin="0,0,6,4" Padding="8,4"
+                                        Background="#FFE0B2" BorderThickness="0"
+                                        FontSize="12" Click="QuickPrompt_Click"/>
+                            </WrapPanel>
+
+                            <!-- Область чата -->
+                            <ScrollViewer Grid.Row="2"
+                                          x:Name="ChatScrollViewer"
+                                          VerticalScrollBarVisibility="Auto"
+                                          Margin="0,0,0,8">
+                                <ItemsControl x:Name="ChatItemsControl">
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="ContentPresenter">
+                                            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="4"
+                                                    Padding="10,8"
+                                                    CornerRadius="10"
+                                                    MaxWidth="600">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#FFF5EDE0"/>
+                                                        <Setter Property="HorizontalAlignment" Value="Left"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Role}" Value="user">
+                                                                <Setter Property="Background" Value="#FFEDBA"/>
+                                                                <Setter Property="HorizontalAlignment" Value="Right"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Text}"
+                                                               TextWrapping="Wrap"
+                                                               FontSize="13"/>
+                                                    <TextBlock Text="{Binding CreatedAt, StringFormat='{}{0:HH:mm}'}"
+                                                               FontSize="10"
+                                                               Opacity="0.5"
+                                                               HorizontalAlignment="Right"
+                                                               Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </ScrollViewer>
 
-                            <Grid Grid.Row="2" Margin="0,10,0,0">
+                            <!-- Поле ввода + кнопки -->
+                            <Grid Grid.Row="3" Margin="0,0,0,4">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <Button Grid.Column="0"
-                                        Content="Запросить анализ"
-                                        Width="160" Height="32"
+                                <TextBox x:Name="UserInputBox"
+                                         Grid.Column="0"
+                                         Height="34"
+                                         Padding="8,6"
+                                         FontSize="13"
+                                         VerticalContentAlignment="Center"
+                                         KeyDown="UserInputBox_KeyDown"/>
+
+                                <Button x:Name="SendButton"
+                                        Grid.Column="1"
+                                        Content="Отправить"
+                                        Width="100" Height="34"
+                                        Margin="8,0,0,0"
                                         Background="#FF9800"
                                         Foreground="White"
                                         BorderThickness="0"
                                         FontWeight="SemiBold"
-                                        Click="GenerateAnalysis_Click"/>
-
-                                <Button Grid.Column="1"
-                                        Content="На весь экран"
-                                        Width="150" Height="32"
-                                        Margin="10,0,0,0"
-                                        Click="OpenAnalysisFullScreen_Click"/>
+                                        Click="SendAssistantMessage_Click"/>
                             </Grid>
+
+                            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,4,0,0">
+                                <Button Content="Очистить чат"
+                                        Width="110" Height="28"
+                                        Background="#A25B00"
+                                        Foreground="White"
+                                        BorderThickness="0"
+                                        FontSize="12"
+                                        Click="ClearChat_Click"/>
+                                <Button Content="На весь экран"
+                                        Width="120" Height="28"
+                                        Margin="8,0,0,0"
+                                        Click="OpenAnalysisFullScreen_Click"/>
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </Grid>

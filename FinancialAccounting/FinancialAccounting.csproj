@@ -348,6 +348,7 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Class\ChatMessage.cs" />
     <Compile Include="Class\CategoryBudget.cs" />
     <Compile Include="Class\DatabaseManager.cs" />
     <Compile Include="DataUploadWindow.xaml.cs">
