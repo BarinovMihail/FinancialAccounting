@@ -4,6 +4,7 @@ using LiveCharts.Wpf;
 using Npgsql;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
@@ -11,6 +12,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace FinancialAccounting
@@ -20,6 +22,8 @@ namespace FinancialAccounting
         private readonly int _accountId;
         private readonly List<TransactionPoint> data = new List<TransactionPoint>();
         private List<DailyPoint> _daily = new List<DailyPoint>();
+        public ObservableCollection<ChatMessage> ChatMessages { get; set; } = new ObservableCollection<ChatMessage>();
+        private readonly MistralService _mistralService = new MistralService(new HttpClient());
 
         public AnalyticsWindow(int accountId)
         {
@@ -29,8 +33,31 @@ namespace FinancialAccounting
             MainChart.DisableAnimations = true;
             Top5ExpensesChart.DisableAnimations = true;
 
+            ChatItemsControl.ItemsSource = ChatMessages;
+            AddGreetingMessage();
+
             LoadCategories();
             InitDashboardEmpty();
+        }
+
+        private void AddGreetingMessage()
+        {
+            ChatMessages.Add(new ChatMessage
+            {
+                Role = "assistant",
+                Text = "Здравствуйте! Я ваш финансовый ассистент. Могу помочь понять структуру расходов, найти аномалии и дать рекомендации по экономии на основе текущих данных.",
+                CreatedAt = DateTime.Now
+            });
+
+            if (data.Count == 0)
+            {
+                ChatMessages.Add(new ChatMessage
+                {
+                    Role = "assistant",
+                    Text = "Для более точных рекомендаций постройте аналитику или выберите нужные фильтры.",
+                    CreatedAt = DateTime.Now
+                });
+            }
         }
 
         private void InitDashboardEmpty()
@@ -511,45 +538,225 @@ WHERE t.accountid = @accountid
         }
 
 
-        private async void GenerateAnalysis_Click(object sender, RoutedEventArgs e)
+        private async void SendAssistantMessage_Click(object sender, RoutedEventArgs e)
         {
-            NeuroAnalysisText.Text = "Анализируем данные...";
+            var userText = UserInputBox.Text?.Trim();
+            if (string.IsNullOrEmpty(userText))
+                return;
 
-            var summary = new StringBuilder();
-            summary.AppendLine(string.Format("Период: {0} - {1}",
-                StartDatePicker.SelectedDate.HasValue ? StartDatePicker.SelectedDate.Value.ToShortDateString() : "",
-                EndDatePicker.SelectedDate.HasValue ? EndDatePicker.SelectedDate.Value.ToShortDateString() : ""
-            ));
-            summary.AppendLine(string.Format("Тип операций: {0}", (TypeComboBox.SelectedItem as ComboBoxItem)?.Content ?? "Все"));
-            summary.AppendLine(string.Format("Категория: {0}", (CategoryComboBox.SelectedItem as ComboBoxItem)?.Content ?? "Все"));
-            summary.AppendLine(string.Format("Количество транзакций: {0}", data.Count));
-            summary.AppendLine(string.Format("Чистая сумма (доход-расход): {0:N0}", data.Sum(d => d.Amount)));
-            summary.AppendLine(string.Format("Расходы (модуль): {0:N0}", data.Where(x => x.Type == "Expense").Sum(x => Math.Abs(x.Amount))));
-            summary.AppendLine(string.Format("Доходы: {0:N0}", data.Where(x => x.Type == "Income").Sum(x => x.Amount)));
-
-            if (data.Count > 0)
+            ChatMessages.Add(new ChatMessage
             {
-                summary.AppendLine();
-                summary.AppendLine("Примеры транзакций (до 10):");
+                Role = "user",
+                Text = userText,
+                CreatedAt = DateTime.Now
+            });
 
-                foreach (var t in data.Take(10))
-                {
-                    var desc = (t.Description ?? "").Trim();
-                    if (desc.Length > 80) desc = desc.Substring(0, 80) + "...";
-                    summary.AppendLine(string.Format("- {0:dd.MM.yyyy}: {1:N0} ({2})", t.Date, t.Amount, desc));
-                }
-            }
+            UserInputBox.Text = "";
+            UserInputBox.IsEnabled = false;
+            SendButton.IsEnabled = false;
+
+            var placeholder = new ChatMessage
+            {
+                Role = "assistant",
+                Text = "Думаю...",
+                CreatedAt = DateTime.Now
+            };
+            ChatMessages.Add(placeholder);
+            ScrollChatToBottom();
 
             try
             {
-                var mistralService = new MistralService(new HttpClient());
-                string analysis = await mistralService.GetAnalysisAsync(summary.ToString());
-                NeuroAnalysisText.Text = analysis;
+                string prompt = BuildAssistantContext(userText);
+                string response = await _mistralService.GetChatResponseAsync(prompt);
+                placeholder.Text = response;
+                RefreshChatDisplay();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                NeuroAnalysisText.Text = "Ошибка анализа: " + ex.Message;
+                placeholder.Text = "Не удалось получить ответ от ассистента. Попробуйте ещё раз.";
+                RefreshChatDisplay();
             }
+            finally
+            {
+                UserInputBox.IsEnabled = true;
+                SendButton.IsEnabled = true;
+                UserInputBox.Focus();
+                ScrollChatToBottom();
+            }
+        }
+
+        private void RefreshChatDisplay()
+        {
+            var source = ChatMessages;
+            ChatItemsControl.ItemsSource = null;
+            ChatItemsControl.ItemsSource = source;
+        }
+
+        private void QuickPrompt_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn)
+            {
+                UserInputBox.Text = btn.Content?.ToString() ?? "";
+                SendAssistantMessage_Click(sender, e);
+            }
+        }
+
+        private void UserInputBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                SendAssistantMessage_Click(sender, e);
+                e.Handled = true;
+            }
+        }
+
+        private void ClearChat_Click(object sender, RoutedEventArgs e)
+        {
+            ChatMessages.Clear();
+            AddGreetingMessage();
+            ScrollChatToBottom();
+        }
+
+        private string BuildAssistantContext(string userMessage)
+        {
+            var sb = new StringBuilder();
+
+            // Section 1 — System role
+            sb.AppendLine("Системная роль: Ты — финансовый аналитик-ассистент.");
+            sb.AppendLine("Отвечай на русском языке.");
+            sb.AppendLine("Давай короткие, практичные, конкретные рекомендации.");
+            sb.AppendLine("Не придумывай данные, которых нет в предоставленных транзакциях.");
+            sb.AppendLine("Основывай весь анализ на текущем отфильтрованном списке транзакций.");
+            sb.AppendLine();
+
+            // Section 2 — Current analytics summary
+            sb.AppendLine("=== Текущие данные ===");
+            sb.AppendLine(string.Format("Период: {0} — {1}",
+                StartDatePicker.SelectedDate.HasValue ? StartDatePicker.SelectedDate.Value.ToString("dd.MM.yyyy") : "не задано",
+                EndDatePicker.SelectedDate.HasValue ? EndDatePicker.SelectedDate.Value.ToString("dd.MM.yyyy") : "не задано"));
+            sb.AppendLine(string.Format("Тип операций: {0}", (TypeComboBox.SelectedItem as ComboBoxItem)?.Content ?? "Все"));
+            sb.AppendLine(string.Format("Категория: {0}", (CategoryComboBox.SelectedItem as ComboBoxItem)?.Content ?? "Все"));
+
+            if (data == null || data.Count == 0)
+            {
+                sb.AppendLine("Данные за выбранный период отсутствуют.");
+            }
+            else
+            {
+                var totalIncome = data.Where(x => x.Type == "Income").Sum(x => x.Amount);
+                var totalExpense = data.Where(x => x.Type == "Expense").Sum(x => Math.Abs(x.Amount));
+
+                sb.AppendLine(string.Format("Количество транзакций: {0}", data.Count));
+                sb.AppendLine(string.Format("Общий доход: {0:N0} руб.", totalIncome));
+                sb.AppendLine(string.Format("Общий расход: {0:N0} руб.", totalExpense));
+                sb.AppendLine(string.Format("Баланс (доход - расход): {0:N0} руб.", totalIncome - totalExpense));
+                sb.AppendLine();
+                sb.AppendLine(GetTopExpenseCategoriesSummary());
+                sb.AppendLine(GetLargestTransactionsSummary());
+                sb.AppendLine(DetectAnomaliesSummary());
+            }
+
+            sb.AppendLine();
+
+            // Section 3 — Recent chat history
+            var recent = ChatMessages.Where(m => m.Text != "Думаю...").ToList();
+            if (recent.Count > 8)
+                recent = recent.Skip(recent.Count - 8).ToList();
+
+            if (recent.Count > 0)
+            {
+                sb.AppendLine("=== Недавняя история чата ===");
+                foreach (var msg in recent)
+                {
+                    var label = msg.Role == "user" ? "Пользователь" : "Ассистент";
+                    sb.AppendLine(string.Format("{0}: {1}", label, msg.Text));
+                }
+                sb.AppendLine();
+            }
+
+            // Section 4 — Current user message
+            sb.AppendLine("=== Текущий вопрос пользователя ===");
+            sb.AppendLine(userMessage);
+
+            return sb.ToString();
+        }
+
+        private string GetTopExpenseCategoriesSummary()
+        {
+            var expenses = data.Where(x => x.Type == "Expense").ToList();
+            if (expenses.Count == 0) return "Топ категорий расходов: нет данных.";
+
+            var top = expenses
+                .GroupBy(x => string.IsNullOrWhiteSpace(x.Category) ? "Без категории" : x.Category)
+                .Select(g => new { Category = g.Key, Sum = g.Sum(t => Math.Abs(t.Amount)) })
+                .OrderByDescending(x => x.Sum)
+                .Take(5)
+                .ToList();
+
+            var sb = new StringBuilder("Топ-5 категорий расходов:");
+            foreach (var item in top)
+                sb.AppendLine(string.Format("  - {0}: {1:N0} руб.", item.Category, item.Sum));
+
+            return sb.ToString();
+        }
+
+        private string GetLargestTransactionsSummary()
+        {
+            var expenses = data.Where(x => x.Type == "Expense").ToList();
+            if (expenses.Count == 0) return "Крупнейшие расходы: нет данных.";
+
+            var top = expenses
+                .OrderBy(x => x.Amount)
+                .Take(5)
+                .ToList();
+
+            var sb = new StringBuilder("Крупнейшие расходы:");
+            foreach (var t in top)
+            {
+                var desc = (t.Description ?? "").Trim();
+                if (desc.Length > 60) desc = desc.Substring(0, 60) + "...";
+                sb.AppendLine(string.Format("  - {0:dd.MM.yyyy}, {1}, {2:N0} руб., {3}",
+                    t.Date, t.Category, Math.Abs(t.Amount), desc));
+            }
+
+            return sb.ToString();
+        }
+
+        private string DetectAnomaliesSummary()
+        {
+            var expenses = data.Where(x => x.Type == "Expense").ToList();
+            if (expenses.Count < 3) return "Аномалии: недостаточно данных для анализа.";
+
+            var avgExpense = expenses.Average(x => Math.Abs(x.Amount));
+            var threshold = avgExpense * 2;
+
+            var anomalies = expenses
+                .Where(x => Math.Abs(x.Amount) > threshold)
+                .OrderBy(x => x.Amount)
+                .Take(5)
+                .ToList();
+
+            if (anomalies.Count == 0)
+                return "Аномалии: аномальных трат не обнаружено (порог: 2x от среднего).";
+
+            var sb = new StringBuilder(string.Format("Возможные аномалии (>2x от среднего {0:N0} руб.):", avgExpense));
+            foreach (var t in anomalies)
+            {
+                var desc = (t.Description ?? "").Trim();
+                if (desc.Length > 50) desc = desc.Substring(0, 50) + "...";
+                sb.AppendLine(string.Format("  - {0:dd.MM.yyyy}, {1}, {2:N0} руб., {3}",
+                    t.Date, t.Category, Math.Abs(t.Amount), desc));
+            }
+
+            return sb.ToString();
+        }
+
+        private void ScrollChatToBottom()
+        {
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                ChatScrollViewer.ScrollToBottom();
+            }));
         }
 
         private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -708,7 +915,9 @@ WHERE t.accountid = @accountid
 
         private void OpenAnalysisFullScreen_Click(object sender, RoutedEventArgs e)
         {
-            var win = new AnalysisFullScreenWindow(NeuroAnalysisText.Text);
+            var lastAssistant = ChatMessages.LastOrDefault(m => m.Role == "assistant" && m.Text != "Думаю...");
+            var text = lastAssistant != null ? lastAssistant.Text : "Нет данных для отображения.";
+            var win = new AnalysisFullScreenWindow(text);
             win.Owner = this;
             win.Show();
         }

@@ -46,6 +46,22 @@ namespace FinancialAccounting.Class
             return await SendChatRequestAsync(requestBody);
         }
 
+        public async Task<string> GetChatResponseAsync(string prompt)
+        {
+            var requestBody = new
+            {
+                model = "mistral-medium",
+                messages = new[]
+                {
+                    new { role = "user", content = prompt }
+                },
+                max_tokens = 2000,
+                temperature = 0.7
+            };
+
+            return await SendChatRequestAsync(requestBody);
+        }
+
         public async Task<ReceiptRecognitionResult> RecognizeReceiptAsync(string imagePath)
         {
             if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
