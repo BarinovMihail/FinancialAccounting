@@ -81,7 +81,7 @@ namespace FinancialAccounting
             }
         }
 
-        private void RegisterText_MouseDown(object sender, MouseButtonEventArgs e)
+        private void RegisterText_MouseDown(object sender, RoutedEventArgs e)
         {
             RegisterWindow registerWindow = new RegisterWindow();
             registerWindow.Show();

@@ -346,7 +346,7 @@
             </TabItem>
 
             <!-- Вкладка 3: бюджеты по категориям -->
-            <TabItem Header="БЮДЖЕТЫ ПО КАТЕГОРИЯМ">
+            <TabItem Header="Бюджеты по категориям">
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>

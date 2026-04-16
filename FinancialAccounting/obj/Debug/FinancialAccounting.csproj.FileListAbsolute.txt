@@ -181,3 +181,5 @@ C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\Microsoft.Bcl.Numerics.xml
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\System.Collections.Immutable.xml
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\bin\Debug\System.Numerics.Tensors.xml
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\BudgetManagementWindow.baml
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\BudgetManagementWindow.g.cs

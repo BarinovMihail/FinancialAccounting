@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  ml-api:
+    build: ./FastApi          # Путь к папке с Dockerfile
+    container_name: ml_api    # Имя контейнера для удобства
+    ports:
+      - "8000:8000"           # Пробрасываем порт (Снаружи:Внутри)
+    restart: always           # Перезапускать, если упадет
