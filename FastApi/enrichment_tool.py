@@ -60,6 +60,17 @@ MERCHANT_STOP_WORDS.update({
     "CARD", "KARTE", "POKARTE",
 })
 
+# Паттерн суффикса Сбербанка: "Операция по карте ****4043" всегда в конце строки
+_SBER_CARD_SUFFIX_RE = re.compile(
+    r"\.?\s*Операция\s+по\s+карте\s+\*+\d{0,6}\s*$",
+    flags=re.IGNORECASE,
+)
+
+
+def strip_sber_suffix(text: str) -> str:
+    """Вырезает суффикс 'Операция по карте ****XXXX' из конца строки."""
+    return _SBER_CARD_SUFFIX_RE.sub("", text or "").strip()
+
 
 def get_mistral_api_key() -> Optional[str]:
     for env_name in ("MISTRAL_API_KEY", "MISTRAL_APIKEY"):
@@ -71,7 +82,9 @@ def get_mistral_api_key() -> Optional[str]:
 
 
 def normalize_description(text: str) -> str:
-    value = (text or "").upper().replace("Ё", "Е")
+    # Сначала убираем сберовский суффикс из оригинала (до upper)
+    value = strip_sber_suffix(text or "")
+    value = value.upper().replace("Ё", "Е")
     value = re.sub(r"\*{2,}\d*", " ", value)
     value = re.sub(r"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b", " ", value)
     value = re.sub(r"\bОПЕРАЦИЯ\s+ПО\s+КАРТЕ\b.*$", " ", value)
@@ -128,11 +141,15 @@ def clean_merchant_name(description: str) -> Optional[str]:
 
 
 def contains_private_data(text: str) -> bool:
-    normalized = normalize_description(text)
+    # Убираем сберовский суффикс ПЕРЕД проверкой приватных паттернов
+    text_clean = strip_sber_suffix(text)
+
+    normalized = normalize_description(text_clean)
     normalized = re.sub(r"\*{2,}\d{2,4}", " ", normalized)
     normalized = re.sub(r"\bОПЕРАЦИЯ\s+ПО\s+КАРТЕ\b", " ", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
-    if any(re.search(pattern, text or "", re.IGNORECASE) for pattern in PRIVATE_PATTERNS):
+
+    if any(re.search(pattern, text_clean, re.IGNORECASE) for pattern in PRIVATE_PATTERNS):
         return True
     return any(re.search(pattern, normalized, re.IGNORECASE) for pattern in TRANSFER_PATTERNS)
 
