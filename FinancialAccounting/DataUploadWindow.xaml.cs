@@ -35,7 +35,7 @@ namespace FinancialAccounting
         private readonly IMlApiClient _mlClient;
         private static readonly string[] ReceiptOcrLanguages = { "rus", "eng" };
         private static readonly string[] SupportedReceiptExtensions = { ".jpg", ".jpeg", ".png" };
-        private const string ReceiptCategoryName = "Супермаркеты";
+        private const string ReceiptCategoryName = "Супермаркет";
         private static readonly string[] ReceiptSummaryTokens =
         {
             "ИТОГ", "ИТОГО", "ВСЕГО", "СУММА", "СКИДКА", "СДАЧА", "НАЛИЧНЫМИ", "БЕЗНАЛИЧНЫМИ", "БЕЗНАЛ", "ПОЛУЧЕНО", "ПРИНЯТО", "ПОДЫТОГ"
