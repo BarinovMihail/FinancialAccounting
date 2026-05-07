@@ -16,6 +16,7 @@ namespace FinancialAccounting.Class
     public class MistralService
     {
         private const string ApiKey = "WdNK0AwaJg27oRiLv67gd9Ztao8jcAt6";
+        private const string ApiKeyEnvironmentVariable = "MISTRAL_API_KEY";
         private const string ChatApiUrl = "https://api.mistral.ai/v1/chat/completions";
         private const string OcrApiUrl = "https://api.mistral.ai/v1/ocr";
         private readonly HttpClient _httpClient;
@@ -23,10 +24,24 @@ namespace FinancialAccounting.Class
         public MistralService(HttpClient httpClient)
         {
             _httpClient = httpClient;
+            string apiKey = GetApiKey();
+
             if (!_httpClient.DefaultRequestHeaders.Contains("Authorization"))
             {
-                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
+                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
             }
+        }
+
+        private static string GetApiKey()
+        {
+            string apiKey = Environment.GetEnvironmentVariable(ApiKeyEnvironmentVariable);
+
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                return ApiKey;
+            }
+
+            return apiKey.Trim();
         }
 
         public async Task<string> GetAnalysisAsync(string inputData)

@@ -434,6 +434,144 @@ namespace FinancialAccounting
             }
         }
 
+        private void AcceptSuggestions_Click(object sender, RoutedEventArgs e)
+        {
+            if (_transactions == null || _transactions.Count == 0)
+            {
+                MessageBox.Show("Нет подсказок для применения.");
+                return;
+            }
+
+            var candidates = _transactions
+                .Where(t => !string.IsNullOrWhiteSpace(t.SuggestedCategory) && t.Category != t.SuggestedCategory)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                MessageBox.Show("Нет новых подсказок для применения.");
+                return;
+            }
+
+            foreach (var transaction in candidates)
+            {
+                transaction.Category = transaction.SuggestedCategory;
+                transaction.NeedsReview = false;
+            }
+
+            if (btnTrainModel != null)
+                btnTrainModel.Visibility = Visibility.Visible;
+
+            TransactionsGrid.Items.Refresh();
+            MessageBox.Show($"Применено подсказок: {candidates.Count}. Дообучение будет выполнено только после подтверждения через кнопку \"Дообучить модель\".");
+        }
+
+        private async void EnrichWeb_Click(object sender, RoutedEventArgs e)
+        {
+            if (_transactions == null || _transactions.Count == 0)
+            {
+                MessageBox.Show("Нет строк для уточнения.");
+                return;
+            }
+
+            var targets = new List<TransactionRecord>();
+            if (TransactionsGrid.SelectedItem is TransactionRecord selectedTransaction)
+            {
+                targets.Add(selectedTransaction);
+            }
+            else
+            {
+                targets = _transactions.Where(t => t.NeedsReview).ToList();
+            }
+
+            if (targets.Count == 0)
+            {
+                MessageBox.Show("Выберите строку или выполните категоризацию, чтобы появились строки для проверки.");
+                return;
+            }
+
+            var categories = GetAvailableCategories();
+            if (categories.Count == 0)
+            {
+                MessageBox.Show("Не найден список доступных категорий.");
+                return;
+            }
+
+            try
+            {
+                if (sender is Button btn) btn.IsEnabled = false;
+                ProgressBar.Visibility = Visibility.Visible;
+                ProgressText.Text = "Уточнение категории через интернет...";
+                ProgressBar.Value = 10;
+
+                int updated = 0;
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    var transaction = targets[i];
+                    var suggestion = await _mlClient.EnrichWebAsync(transaction, categories);
+                    ProgressBar.Value = 10 + (i + 1) * 80.0 / targets.Count;
+
+                    if (suggestion == null)
+                        continue;
+
+                    string message =
+                        $"Описание: {transaction.Description}\n\n" +
+                        $"Предложенная категория: {suggestion.category}\n" +
+                        $"Уверенность: {suggestion.confidence:P0}\n" +
+                        $"Источник: {suggestion.source}\n" +
+                        $"Причина: {suggestion.reason}\n\n" +
+                        "Применить эту подсказку к строке?";
+
+                    var result = MessageBox.Show(
+                        message,
+                        "Уточнение через интернет",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+
+                    transaction.SuggestedCategory = suggestion.category;
+                    transaction.SuggestionReason = suggestion.reason;
+                    transaction.MlConfidence = suggestion.confidence;
+                    transaction.PredictionSource = suggestion.source;
+
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        transaction.Category = suggestion.category;
+                        transaction.NeedsReview = false;
+                        updated++;
+                    }
+                }
+
+                if (updated > 0 && btnTrainModel != null)
+                    btnTrainModel.Visibility = Visibility.Visible;
+
+                TransactionsGrid.Items.Refresh();
+                MessageBox.Show(updated > 0
+                    ? $"Применено уточнений: {updated}. Модель не дообучалась автоматически."
+                    : "Уточнение завершено. Автоматических изменений категории не выполнено.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при интернет-уточнении: " + ex.Message,
+                                "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                ProgressBar.Visibility = Visibility.Collapsed;
+                ProgressBar.Value = 0;
+                ProgressText.Text = string.Empty;
+                if (sender is Button btn) btn.IsEnabled = true;
+            }
+        }
+
+        private List<string> GetAvailableCategories()
+        {
+            return CategoryComboBox.Items
+                .OfType<ComboBoxItem>()
+                .Select(item => item.Content?.ToString())
+                .Where(name => !string.IsNullOrWhiteSpace(name) && name != "Все" && name != "Все категории")
+                .Distinct()
+                .ToList();
+        }
+
         private async void SaveDatabase_Click(object sender, RoutedEventArgs e)
         {
             if (_transactions == null || _transactions.Count == 0)
@@ -580,7 +718,7 @@ namespace FinancialAccounting
                 if (CategoryComboBox.SelectedItem is ComboBoxItem selectedCategoryItem)
                 {
                     string selectedCategory = selectedCategoryItem.Content.ToString();
-                    if (selectedCategory != "Все категории")
+                    if (selectedCategory != "Все категории" && selectedCategory != "Все")
                     {
                         filteredList = filteredList.Where(r => r.Category == selectedCategory);
                     }

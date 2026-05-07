@@ -290,6 +290,7 @@
     <Compile Include="Class\IMlApiClient.cs" />
     <Compile Include="Class\MistralService.cs" />
     <Compile Include="Class\Models\MlApiClient.cs" />
+    <Compile Include="Class\Models\MlCategorySuggestion.cs" />
     <Compile Include="Class\Models\MlFeedbackRequest.cs" />
     <Compile Include="Class\Models\MlPredictedTransaction.cs" />
     <Compile Include="Class\Models\MlPredictRequest.cs" />

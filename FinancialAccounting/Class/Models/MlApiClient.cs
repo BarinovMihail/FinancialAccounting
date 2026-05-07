@@ -14,6 +14,7 @@ public class MlApiClient : IMlApiClient
 
     private readonly string _predictUrl = "http://127.0.0.1:8000/predict";
     private readonly string _feedbackUrl = "http://127.0.0.1:8000/feedback";
+    private readonly string _enrichWebUrl = "http://127.0.0.1:8000/enrich-web";
 
     public MlApiClient()
         : this(new HttpClient { Timeout = TimeSpan.FromSeconds(60) })
@@ -39,7 +40,8 @@ public class MlApiClient : IMlApiClient
             {
                 description = t.Description ?? string.Empty,
                 amount = t.Amount ?? string.Empty,
-                date = t.Date ?? string.Empty
+                date = t.Date ?? string.Empty,
+                type = t.Type ?? string.Empty
             }).ToList()
         };
 
@@ -66,7 +68,15 @@ public class MlApiClient : IMlApiClient
             // Обновляем категории в исходном списке по порядку
             for (int i = 0; i < transactions.Count && i < mlResponse.results.Count; i++)
             {
-                transactions[i].Category = mlResponse.results[i].predicted_category;
+                var prediction = mlResponse.results[i];
+                var firstSuggestion = prediction.suggestions?.FirstOrDefault();
+
+                transactions[i].Category = prediction.predicted_category;
+                transactions[i].MlConfidence = prediction.confidence;
+                transactions[i].PredictionSource = prediction.source;
+                transactions[i].NeedsReview = prediction.needs_review;
+                transactions[i].SuggestedCategory = firstSuggestion?.category;
+                transactions[i].SuggestionReason = firstSuggestion?.reason ?? prediction.suggestion_reason;
             }
 
             return transactions;
@@ -75,6 +85,48 @@ public class MlApiClient : IMlApiClient
         {
             System.Diagnostics.Debug.WriteLine("ML Predict error: " + ex);
             return transactions;
+        }
+    }
+
+    public async Task<MlCategorySuggestion> EnrichWebAsync(TransactionRecord transaction, List<string> availableCategories)
+    {
+        if (transaction == null || string.IsNullOrWhiteSpace(transaction.Description))
+            return null;
+
+        var requestPayload = new EnrichWebRequestDto
+        {
+            Description = transaction.Description ?? string.Empty,
+            Amount = transaction.Amount ?? string.Empty,
+            AvailableCategories = availableCategories ?? new List<string>()
+        };
+
+        string json = JsonConvert.SerializeObject(requestPayload, Formatting.None);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        try
+        {
+            var response = await _httpClient.PostAsync(_enrichWebUrl, content);
+            string respJson = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                System.Diagnostics.Debug.WriteLine($"ML EnrichWeb error code: {response.StatusCode}\n{respJson}");
+                return null;
+            }
+
+            var enrichResponse = JsonConvert.DeserializeObject<EnrichWebResponseDto>(respJson);
+            if (enrichResponse == null || !enrichResponse.Success || enrichResponse.Suggestion == null)
+            {
+                System.Diagnostics.Debug.WriteLine("ML EnrichWeb rejected: " + (enrichResponse?.Message ?? respJson));
+                return null;
+            }
+
+            return enrichResponse.Suggestion;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine("ML EnrichWeb error: " + ex);
+            return null;
         }
     }
 
@@ -135,5 +187,32 @@ public class MlApiClient : IMlApiClient
 
         [JsonProperty("correct_category")]
         public string CorrectCategory { get; set; }
+    }
+
+    private class EnrichWebRequestDto
+    {
+        [JsonProperty("description")]
+        public string Description { get; set; }
+
+        [JsonProperty("amount")]
+        public string Amount { get; set; }
+
+        [JsonProperty("available_categories")]
+        public List<string> AvailableCategories { get; set; }
+    }
+
+    private class EnrichWebResponseDto
+    {
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        [JsonProperty("suggestion")]
+        public MlCategorySuggestion Suggestion { get; set; }
+
+        [JsonProperty("safe_query")]
+        public string SafeQuery { get; set; }
+
+        [JsonProperty("message")]
+        public string Message { get; set; }
     }
 }

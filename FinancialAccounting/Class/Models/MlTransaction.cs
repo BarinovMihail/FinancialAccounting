@@ -11,5 +11,7 @@ namespace FinancialAccounting.Class.Models
         public string description { get; set; }
         public string amount { get; set; }
         public string date { get; set; }
+        public string bank { get; set; }
+        public string type { get; set; }
     }
 }
