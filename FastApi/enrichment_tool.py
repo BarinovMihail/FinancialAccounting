@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from html import unescape
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import quote_plus
@@ -53,6 +54,13 @@ MERCHANT_STOP_WORDS = {
 }
 
 
+MERCHANT_STOP_WORDS.update({
+    "OPLATA", "OOO", "OAO", "IP", "LLC", "LTD", "MOSCOWRU", "MOSCOWRUS",
+    "MOSKVA", "MOSKVARUS", "PAYMENT", "SERVICES", "SERVICE", "PROVIDER",
+    "CARD", "KARTE", "POKARTE",
+})
+
+
 def get_mistral_api_key() -> Optional[str]:
     for env_name in ("MISTRAL_API_KEY", "MISTRAL_APIKEY"):
         value = os.getenv(env_name)
@@ -70,6 +78,53 @@ def normalize_description(text: str) -> str:
     value = re.sub(r"[^\wА-ЯA-Z\s\-]+", " ", value, flags=re.IGNORECASE)
     value = re.sub(r"\s+", " ", value).strip()
     return value
+
+
+def clean_merchant_name(description: str) -> Optional[str]:
+    normalized = normalize_description(description)
+    if not normalized:
+        return None
+
+    cleanup_patterns = [
+        r"\bОПЛАТА\s+В\b",
+        r"\bОПЛАТА\b",
+        r"\bOPLATA\s+V\b",
+        r"\bOPLATA\b",
+        r"\bYM\b",
+        r"\bОПЕРАЦИЯ\s+ПО\s*КАРТЕ\b.*$",
+        r"\bОПЕРАЦИЯ\s+ПОКАРТЕ\b.*$",
+        r"\bPO\s*KARTE\b.*$",
+        r"\bPOKARTE\b.*$",
+        r"\bOOO\b",
+        r"\bООО\b",
+        r"\bOAO\b",
+        r"\bИП\b",
+        r"\bIP\b",
+    ]
+
+    cleaned = normalized
+    for pattern in cleanup_patterns:
+        cleaned = re.sub(pattern, " ", cleaned, flags=re.IGNORECASE)
+
+    cleaned = re.sub(r"\bMOSCOW\s*RUS?\b", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bMOSCOWRU(S)?\b", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"MOSCOWRU(S)?$", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bMOSKVA\s*RUS?\b", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bMOSKVARU(S)?\b", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"MOSKVA.*$", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bVEL\s+NOVGOROD\b", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bNOVGOROD\b", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\bRUS\b|\bRU\b", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b\d+\b", " ", cleaned)
+
+    tokens = [
+        token for token in cleaned.split()
+        if len(token) >= 2 and token not in MERCHANT_STOP_WORDS
+    ]
+    if not tokens:
+        return None
+
+    return " ".join(tokens[:4]).strip() or None
 
 
 def contains_private_data(text: str) -> bool:
@@ -97,6 +152,12 @@ def extract_merchant_name(description: str) -> Optional[str]:
     if contains_private_data(description):
         return None
 
+    raw_upper = (description or "").upper()
+    if re.search(r"\bAIA\W*5\s*KA\b", raw_upper, re.IGNORECASE):
+        return "AIA*5KA"
+    if re.search(r"\bYM\W*FAST\W*ANIME", raw_upper, re.IGNORECASE):
+        return "FAST ANIME"
+
     normalized = normalize_description(description)
     if not normalized:
         return None
@@ -106,6 +167,10 @@ def extract_merchant_name(description: str) -> Optional[str]:
         merchant_norm = normalize_description(merchant)
         if merchant_norm and re.search(rf"(^|\s){re.escape(merchant_norm)}(\s|$)", normalized):
             return merchant
+
+    cleaned_merchant = clean_merchant_name(description)
+    if cleaned_merchant:
+        return cleaned_merchant
 
     tokens = [
         token for token in normalized.split()
@@ -196,31 +261,162 @@ def search_web_for_merchant(merchant_name: str) -> Optional[str]:
     if not safe_query or contains_private_data(safe_query):
         return None
 
-    url = (
-        "https://api.duckduckgo.com/"
-        f"?q={quote_plus(safe_query)}&format=json&no_redirect=1&no_html=1&skip_disambig=1"
-    )
+    query_candidates = [
+        f'"{safe_query}"',
+        f'"{safe_query}" company',
+        f'"{safe_query}" merchant',
+        f"{safe_query} company",
+        f"{safe_query} merchant",
+        f"{safe_query} official",
+        f"{safe_query} store",
+    ]
+    bing_context = _search_bing_html(query_candidates)
+    if bing_context:
+        return bing_context
 
-    try:
-        response = requests.get(url, timeout=8, headers={"User-Agent": "FinancialAccounting/1.0"})
-        response.raise_for_status()
-        data = response.json()
-    except Exception:
-        return None
+    html_context = _search_duckduckgo_html([
+        safe_query,
+        f"{safe_query} company",
+        f"{safe_query} merchant",
+        f"{safe_query} official",
+        f"{safe_query} store",
+    ])
+    if html_context:
+        return html_context
 
     parts = []
-    for key in ("AbstractText", "Heading"):
-        value = data.get(key)
-        if value:
-            parts.append(str(value))
+    query_candidates = [
+        safe_query,
+        f"{safe_query} company",
+        f"{safe_query} merchant",
+        f"{safe_query} магазин",
+        f"{safe_query} организация",
+    ]
 
-    for item in data.get("RelatedTopics", [])[:5]:
-        if isinstance(item, dict) and item.get("Text"):
-            parts.append(str(item["Text"]))
+    for query in query_candidates:
+        url = (
+            "https://api.duckduckgo.com/"
+            f"?q={quote_plus(query)}&format=json&no_redirect=1&no_html=1&skip_disambig=1"
+        )
+
+        try:
+            response = requests.get(url, timeout=8, headers={"User-Agent": "FinancialAccounting/1.0"})
+            response.raise_for_status()
+            data = response.json()
+        except Exception:
+            continue
+
+        for key in ("AbstractText", "Heading"):
+            value = data.get(key)
+            if value:
+                parts.append(str(value))
+
+        for item in data.get("RelatedTopics", [])[:5]:
+            if isinstance(item, dict) and item.get("Text"):
+                parts.append(str(item["Text"]))
+
+        if parts:
+            break
 
     context = " ".join(parts)
     context = re.sub(r"\s+", " ", context).strip()
+    if context:
+        return context[:2000]
+
+    return (
+        "No public search summary was found. Classify using only this sanitized merchant "
+        f"name from the bank transaction: {safe_query}."
+    )
+
+
+def _search_duckduckgo_html(query_candidates: List[str]) -> Optional[str]:
+    snippets = []
+
+    for query in query_candidates:
+        try:
+            response = requests.post(
+                "https://html.duckduckgo.com/html/",
+                data={"q": query},
+                timeout=10,
+                headers={
+                    "User-Agent": "Mozilla/5.0 FinancialAccounting/1.0",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+            )
+            response.raise_for_status()
+        except Exception:
+            continue
+
+        titles = re.findall(
+            r'class="result__a"[^>]*>(.*?)</a>',
+            response.text,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        body_snippets = re.findall(
+            r'class="result__snippet"[^>]*>(.*?)</(?:a|div)>',
+            response.text,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        for value in titles[:5] + body_snippets[:5]:
+            cleaned = _clean_html_fragment(value)
+            if cleaned and cleaned not in snippets:
+                snippets.append(cleaned)
+
+        if snippets:
+            break
+
+    context = " ".join(snippets)
+    context = re.sub(r"\s+", " ", context).strip()
     return context[:2000] if context else None
+
+
+def _search_bing_html(query_candidates: List[str]) -> Optional[str]:
+    snippets = []
+
+    for query in query_candidates:
+        try:
+            response = requests.get(
+                "https://www.bing.com/search",
+                params={"q": query, "setlang": "ru-RU"},
+                timeout=10,
+                headers={"User-Agent": "Mozilla/5.0 FinancialAccounting/1.0"},
+            )
+            response.raise_for_status()
+        except Exception:
+            continue
+
+        result_blocks = re.findall(
+            r'<li class="b_algo"[^>]*>(.*?)</li>',
+            response.text,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        for block in result_blocks[:5]:
+            title_match = re.search(r"<h2[^>]*>(.*?)</h2>", block, flags=re.IGNORECASE | re.DOTALL)
+            snippet_match = re.search(r"<p[^>]*>(.*?)</p>", block, flags=re.IGNORECASE | re.DOTALL)
+
+            for match in (title_match, snippet_match):
+                if not match:
+                    continue
+
+                cleaned = _clean_html_fragment(match.group(1))
+                if cleaned and cleaned not in snippets:
+                    snippets.append(cleaned)
+
+        if snippets:
+            break
+
+    context = " ".join(snippets)
+    context = re.sub(r"\s+", " ", context).strip()
+    return context[:2000] if context else None
+
+
+def _clean_html_fragment(value: str) -> str:
+    cleaned = re.sub(r"<[^>]+>", " ", value or "")
+    cleaned = unescape(cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip()
 
 
 def ask_mistral_for_category(

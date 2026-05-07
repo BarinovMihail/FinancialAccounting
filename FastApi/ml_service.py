@@ -16,6 +16,7 @@ from enrichment_tool import (
     contains_private_data,
     enrich_locally,
     extract_merchant_name,
+    lookup_merchant_rules,
     normalize_description,
     search_web_for_merchant,
 )
@@ -337,12 +338,20 @@ def enrich_web(request: EnrichWebRequest):
             message="Безопасное название организации не прошло проверку приватности.",
         )
 
+    local_suggestion = lookup_merchant_rules(request.description) or lookup_merchant_rules(merchant_name)
+    if local_suggestion:
+        return EnrichWebResponse(
+            success=True,
+            suggestion=local_suggestion,
+            safe_query=safe_query,
+            message="Категория найдена в локальном словаре мерчантов. Интернет-поиск не выполнялся.",
+        )
+
     web_context = search_web_for_merchant(safe_query)
     if not web_context:
-        return EnrichWebResponse(
-            success=False,
-            safe_query=safe_query,
-            message="Не удалось получить описание организации из внешнего поиска.",
+        web_context = (
+            "No public search summary was found. Classify using only this sanitized merchant "
+            f"name from the bank transaction: {safe_query}."
         )
 
     suggestion = ask_mistral_for_category(
