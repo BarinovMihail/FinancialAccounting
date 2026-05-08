@@ -50,7 +50,7 @@ TRANSFER_PATTERNS = [
 
 MERCHANT_STOP_WORDS = {
     "OPERATION", "OPERACIYA", "ОПЕРАЦИЯ", "КАРТЕ", "КАРТА", "ПО", "RUS",
-    "RU", "MOSCOW", "SPB", "SANKT", "PETERBURG", "VEL", "NOVGOROD",
+    "RU", "MOSCOW", "SPB", "SANKT", "PETERBURG"
 }
 
 

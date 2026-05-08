@@ -26,6 +26,7 @@ app = FastAPI(title="Transaction Categorization API")
 
 BASE_DIR = Path(__file__).resolve().parent
 DATASET_PATH = BASE_DIR / "dataset.csv"
+USER_CORRECTIONS_PATH = BASE_DIR / "user_corrections.csv"
 MODEL_FILE = BASE_DIR / "sgd_model.pkl"
 VECT_FILE = BASE_DIR / "hashing_vect.pkl"
 LOW_CONFIDENCE_THRESHOLD = 0.55
@@ -116,11 +117,15 @@ def save_model():
 def load_exact_matches():
     global exact_matches
     exact_matches = {}
-    if not DATASET_PATH.exists():
+    if not USER_CORRECTIONS_PATH.exists():
         return
 
     try:
-        df = pd.read_csv(DATASET_PATH, sep=";", usecols=["description", "category"])
+        df = pd.read_csv(
+            USER_CORRECTIONS_PATH,
+            sep=";",
+            usecols=["description", "category"],
+        )
         df = df.dropna(subset=["description", "category"])
         df = df.drop_duplicates(subset=["description"], keep="last")
         exact_matches = {
@@ -128,9 +133,9 @@ def load_exact_matches():
             for _, row in df.iterrows()
             if normalize_description(str(row["description"]))
         }
-        print(f"Loaded {len(exact_matches)} exact category rules.")
+        print(f"Loaded {len(exact_matches)} user correction exact rules.")
     except Exception as exc:
-        print(f"Exact rules loading error: {exc}")
+        print(f"User correction exact rules loading error: {exc}")
 
 
 def init_model_from_dataset():
@@ -277,7 +282,7 @@ def predict(request: PredictRequest):
                 category=exact_category,
                 confidence=1.0,
                 source="exact_match",
-                reason="Описание найдено в подтвержденном локальном датасете.",
+                reason="Описание найдено в пользовательских исправлениях.",
             )
             results.append(
                 make_prediction_response(
@@ -402,6 +407,16 @@ def feedback(request: FeedbackRequest):
             mode="a",
             sep=";",
             header=header_needed,
+            index=False,
+            columns=column_order,
+        )
+
+        corrections_header_needed = not USER_CORRECTIONS_PATH.exists()
+        df_new.to_csv(
+            USER_CORRECTIONS_PATH,
+            mode="a",
+            sep=";",
+            header=corrections_header_needed,
             index=False,
             columns=column_order,
         )
