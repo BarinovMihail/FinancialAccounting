@@ -70,8 +70,70 @@ def get_mistral_api_key() -> Optional[str]:
     return DEFAULT_MISTRAL_API_KEY
 
 
+def strip_bank_card_suffix(text: str) -> str:
+    value = text or ""
+    value = strip_statement_noise(value)
+    value = re.sub(
+        r"\s*\.?\s*Операция\s+по\s*карте\s+\*{2,}\d{2,4}.*$",
+        " ",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(
+        r"\s*\.?\s*Операция\s+покарте\s+\*{2,}\d{2,4}.*$",
+        " ",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(
+        r"\s*\.?\s*OPERATION\s+(?:BY|ON)?\s*CARD\s+\*{2,}\d{2,4}.*$",
+        " ",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = strip_statement_noise(value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def strip_statement_noise(text: str) -> str:
+    value = text or ""
+    markers = [
+        "Продолжение на следующей странице",
+        "Для проверки подлинности документа",
+        "Выписка по счёту дебетовой карты",
+        "Выписка по счету дебетовой карты",
+        "Страница",
+        "ДАТА ОПЕРАЦИИ",
+        "Дата обработки",
+        "КАТЕГОРИЯ",
+        "Описание операции",
+        "СУММА В ВАЛЮТЕ СЧЁТА",
+        "Сумма в валюте операции",
+        "ОСТАТОК СРЕДСТВ",
+        "ПАО Сбербанк",
+        "Генеральная лицензия",
+        "Денежные средства",
+        "Дергунова",
+        "Управляющий директор",
+        "Дивизиона",
+        "Дата формирования",
+    ]
+
+    upper_value = value.upper()
+    first_index = None
+    for marker in markers:
+        marker_index = upper_value.find(marker.upper())
+        if marker_index >= 0 and (first_index is None or marker_index < first_index):
+            first_index = marker_index
+
+    if first_index is not None:
+        value = value[:first_index]
+
+    return value.strip()
+
+
 def normalize_description(text: str) -> str:
-    value = (text or "").upper().replace("Ё", "Е")
+    value = strip_bank_card_suffix(text).upper().replace("Ё", "Е")
     value = re.sub(r"\*{2,}\d*", " ", value)
     value = re.sub(r"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b", " ", value)
     value = re.sub(r"\bОПЕРАЦИЯ\s+ПО\s+КАРТЕ\b.*$", " ", value)
@@ -128,11 +190,12 @@ def clean_merchant_name(description: str) -> Optional[str]:
 
 
 def contains_private_data(text: str) -> bool:
-    normalized = normalize_description(text)
+    safe_text = strip_bank_card_suffix(text)
+    normalized = normalize_description(safe_text)
     normalized = re.sub(r"\*{2,}\d{2,4}", " ", normalized)
     normalized = re.sub(r"\bОПЕРАЦИЯ\s+ПО\s+КАРТЕ\b", " ", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
-    if any(re.search(pattern, text or "", re.IGNORECASE) for pattern in PRIVATE_PATTERNS):
+    if any(re.search(pattern, safe_text or "", re.IGNORECASE) for pattern in PRIVATE_PATTERNS):
         return True
     return any(re.search(pattern, normalized, re.IGNORECASE) for pattern in TRANSFER_PATTERNS)
 

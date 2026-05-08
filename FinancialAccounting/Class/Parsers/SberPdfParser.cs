@@ -59,34 +59,75 @@ namespace FinancialAccounting
                     if (record.Length > 10)
                         desc = record.Substring(10).Trim();
 
-                    var descMatch = Regex.Match(desc, @"^(.*?\*{4}\d{4})");
-                    if (descMatch.Success)
-                    {
-                        desc = descMatch.Groups[1].Value.Trim();
-                    }
-                    else
-                    {
-                        string[] stopWords = { "ПАО Сбербанк", "Генеральная лицензия", "Денежные средства" };
-                        foreach (var stopWord in stopWords)
-                        {
-                            int stopIndex = desc.IndexOf(stopWord, System.StringComparison.OrdinalIgnoreCase);
-                            if (stopIndex >= 0)
-                            {
-                                desc = desc.Substring(0, stopIndex).Trim();
-                                break;
-                            }
-                        }
-                    }
+                    desc = CleanupDescription(desc);
 
                     if (transactions.Any())
                     {
                         transactions.Last().Description += " " + desc;
-                        transactions.Last().Description = transactions.Last().Description.Trim();
+                        transactions.Last().Description = CleanupDescription(transactions.Last().Description);
                     }
                 }
             }
            
             return transactions;
+        }
+
+        private static string CleanupDescription(string description)
+        {
+            if (string.IsNullOrWhiteSpace(description))
+                return string.Empty;
+
+            string cleaned = Regex.Replace(description.Trim(), @"\s+", " ");
+            cleaned = Regex.Replace(
+                cleaned,
+                @"\s*\.?\s*Операция\s+по\s*карте\s+\*{2,}\d{2,4}.*$",
+                "",
+                RegexOptions.IgnoreCase);
+            cleaned = Regex.Replace(
+                cleaned,
+                @"\s*\.?\s*Операция\s+покарте\s+\*{2,}\d{2,4}.*$",
+                "",
+                RegexOptions.IgnoreCase);
+
+            cleaned = CutAtFirstMarker(cleaned, new[]
+            {
+                "Продолжение на следующей странице",
+                "Для проверки подлинности документа",
+                "Выписка по счёту дебетовой карты",
+                "Выписка по счету дебетовой карты",
+                "Страница",
+                "ДАТА ОПЕРАЦИИ",
+                "Дата обработки",
+                "КАТЕГОРИЯ",
+                "Описание операции",
+                "СУММА В ВАЛЮТЕ СЧЁТА",
+                "Сумма в валюте операции",
+                "ОСТАТОК СРЕДСТВ",
+                "ПАО Сбербанк",
+                "Генеральная лицензия",
+                "Денежные средства",
+                "Дергунова",
+                "Управляющий директор",
+                "Дивизиона",
+                "Дата формирования"
+            });
+
+            cleaned = Regex.Replace(cleaned, @"\s+", " ").Trim(' ', '.', ';', ',');
+            return cleaned;
+        }
+
+        private static string CutAtFirstMarker(string text, string[] markers)
+        {
+            int firstIndex = -1;
+
+            foreach (var marker in markers)
+            {
+                int markerIndex = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (markerIndex >= 0 && (firstIndex < 0 || markerIndex < firstIndex))
+                    firstIndex = markerIndex;
+            }
+
+            return firstIndex >= 0 ? text.Substring(0, firstIndex).Trim() : text;
         }
     }
 }
