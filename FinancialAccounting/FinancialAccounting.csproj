@@ -403,7 +403,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="Migrations\add_category_budgets.sql" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="finance_icon.ico" />

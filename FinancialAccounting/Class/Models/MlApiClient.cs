@@ -164,6 +164,33 @@ public class MlApiClient : IMlApiClient
                 return false;
             }
 
+            string respJson = await response.Content.ReadAsStringAsync();
+            var feedbackResponse = JsonConvert.DeserializeObject<FeedbackResponseDto>(respJson);
+            if (feedbackResponse == null || !feedbackResponse.Success)
+            {
+                System.Diagnostics.Debug.WriteLine("ML Feedback rejected: " + (feedbackResponse?.Message ?? respJson));
+                return false;
+            }
+
+            if (feedbackResponse.UpdatedCount != feedbackItems.Count)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"ML Feedback updated {feedbackResponse.UpdatedCount} of {feedbackItems.Count}. " +
+                    $"Dataset: {feedbackResponse.DatasetPath}; Corrections: {feedbackResponse.UserCorrectionsPath}");
+                return false;
+            }
+
+            System.Diagnostics.Debug.WriteLine(
+                $"ML Feedback saved {feedbackResponse.UpdatedCount}. " +
+                $"Dataset: {feedbackResponse.DatasetPath}; Corrections: {feedbackResponse.UserCorrectionsPath}");
+            if (!string.IsNullOrWhiteSpace(feedbackResponse.DatasetBackupPath) ||
+                !string.IsNullOrWhiteSpace(feedbackResponse.UserCorrectionsBackupPath))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"ML Feedback moved invalid CSV backups. " +
+                    $"Dataset backup: {feedbackResponse.DatasetBackupPath}; " +
+                    $"Corrections backup: {feedbackResponse.UserCorrectionsBackupPath}");
+            }
             return true;
         }
         catch (Exception ex)
@@ -187,6 +214,30 @@ public class MlApiClient : IMlApiClient
 
         [JsonProperty("correct_category")]
         public string CorrectCategory { get; set; }
+    }
+
+    private class FeedbackResponseDto
+    {
+        [JsonProperty("success")]
+        public bool Success { get; set; }
+
+        [JsonProperty("updated_count")]
+        public int UpdatedCount { get; set; }
+
+        [JsonProperty("dataset_path")]
+        public string DatasetPath { get; set; }
+
+        [JsonProperty("user_corrections_path")]
+        public string UserCorrectionsPath { get; set; }
+
+        [JsonProperty("dataset_backup_path")]
+        public string DatasetBackupPath { get; set; }
+
+        [JsonProperty("user_corrections_backup_path")]
+        public string UserCorrectionsBackupPath { get; set; }
+
+        [JsonProperty("message")]
+        public string Message { get; set; }
     }
 
     private class EnrichWebRequestDto

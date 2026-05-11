@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -114,9 +115,32 @@ def save_model():
     joblib.dump(vectorizer, VECT_FILE)
 
 
+def is_excel_zip_file(path: Path) -> bool:
+    if not path.exists() or path.stat().st_size < 4:
+        return False
+
+    try:
+        with path.open("rb") as file:
+            return file.read(4).startswith(b"PK\x03\x04")
+    except OSError:
+        return False
+
+
+def quarantine_invalid_csv(path: Path) -> Optional[Path]:
+    if not is_excel_zip_file(path):
+        return None
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = path.with_name(f"{path.stem}.invalid_xlsx_{timestamp}.xlsx")
+    path.replace(backup_path)
+    print(f"{path.name} looked like an Excel/xlsx file and was moved to {backup_path}")
+    return backup_path
+
+
 def load_exact_matches():
     global exact_matches
     exact_matches = {}
+    quarantine_invalid_csv(USER_CORRECTIONS_PATH)
     if not USER_CORRECTIONS_PATH.exists():
         return
 
@@ -390,6 +414,9 @@ def feedback(request: FeedbackRequest):
     categories = [item.correct_category for item in request.items]
 
     try:
+        dataset_backup = quarantine_invalid_csv(DATASET_PATH)
+        corrections_backup = quarantine_invalid_csv(USER_CORRECTIONS_PATH)
+
         df_new = pd.DataFrame(
             {
                 "date": [""] * len(descriptions),
@@ -409,6 +436,7 @@ def feedback(request: FeedbackRequest):
             header=header_needed,
             index=False,
             columns=column_order,
+            encoding="utf-8",
         )
 
         corrections_header_needed = not USER_CORRECTIONS_PATH.exists()
@@ -419,6 +447,7 @@ def feedback(request: FeedbackRequest):
             header=corrections_header_needed,
             index=False,
             columns=column_order,
+            encoding="utf-8",
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"CSV write error: {exc}")
@@ -441,6 +470,10 @@ def feedback(request: FeedbackRequest):
     return {
         "success": True,
         "updated_count": len(descriptions),
+        "dataset_path": str(DATASET_PATH.resolve()),
+        "user_corrections_path": str(USER_CORRECTIONS_PATH.resolve()),
+        "dataset_backup_path": str(dataset_backup.resolve()) if dataset_backup else None,
+        "user_corrections_backup_path": str(corrections_backup.resolve()) if corrections_backup else None,
         "message": "Данные сохранены, модель дообучена через подтвержденный /feedback",
     }
 
