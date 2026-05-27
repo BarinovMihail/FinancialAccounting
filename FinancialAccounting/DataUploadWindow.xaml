@@ -397,7 +397,6 @@
                     <DataGridTextColumn Header="Описание"  Binding="{Binding Description}" Width="2*"/>
                     <DataGridTextColumn Header="Уверенность" Binding="{Binding MlConfidenceDisplay}" Width="110"/>
                     <DataGridTextColumn Header="Источник" Binding="{Binding PredictionSource}" Width="120"/>
-                    <DataGridTextColumn Header="Подсказка" Binding="{Binding SuggestedCategory}" Width="160"/>
                 </DataGrid.Columns>
             </DataGrid>
         </Border>

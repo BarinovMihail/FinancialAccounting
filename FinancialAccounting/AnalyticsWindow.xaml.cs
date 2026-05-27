@@ -39,6 +39,7 @@ namespace FinancialAccounting
 
             LoadCategories();
             InitDashboardEmpty();
+            LoadBudgetTab();
         }
 
         private void AddGreetingMessage()
@@ -425,9 +426,9 @@ WHERE t.accountid = @accountid
             MaxExpenseText.Text = maxExpense == null ? "—" : $"{Math.Abs(maxExpense.Amount):N0}";
             MaxExpenseDateText.Text = maxExpense == null ? "" : $"{maxExpense.Date:dd.MM.yyyy}";
 
-            // популярный супермаркет (categoryId=33) по количеству
+            // популярный супермаркет по количеству чеков/позиций
             var marketAgg = expenses
-                .Where(x => x.CategoryId == 33)
+                .Where(IsSupermarketExpense)
                 .Select(x => new { Merchant = ExtractMerchant(x.Description), AmountAbs = Math.Abs(x.Amount) })
                 .Where(x => !string.IsNullOrWhiteSpace(x.Merchant))
                 .GroupBy(x => x.Merchant)
@@ -439,9 +440,9 @@ WHERE t.accountid = @accountid
             TopMarketText.Text = marketAgg == null ? "—" : $"{marketAgg.Merchant} ({marketAgg.Count} чек.)";
             TopMarketSumText.Text = marketAgg == null ? "" : $"Потрачено: {marketAgg.Sum:N0}";
 
-            // Top‑10 супермаркетов (список)
+            // Top‑5 супермаркетов (список)
             var topMarkets10 = expenses
-                .Where(x => x.CategoryId == 33)
+                .Where(IsSupermarketExpense)
                 .Select(x => new { Merchant = ExtractMerchant(x.Description), AmountAbs = Math.Abs(x.Amount) })
                 .Where(x => !string.IsNullOrWhiteSpace(x.Merchant))
                 .GroupBy(x => x.Merchant)
@@ -497,12 +498,22 @@ WHERE t.accountid = @accountid
             };
         }
 
+        private bool IsSupermarketExpense(TransactionPoint transaction)
+        {
+            return string.Equals(transaction?.Category?.Trim(), "Супермаркет", StringComparison.OrdinalIgnoreCase);
+        }
+
         // Из "Оплата в PYATEROCHKA 22158 VEL.NOVGOROD RUS" -> "PYATEROCHKA"
         private string ExtractMerchant(string description)
         {
             if (string.IsNullOrWhiteSpace(description)) return null;
 
             var s = description.Trim();
+
+            // Для чеков описание хранится как "Магазин: товар".
+            var receiptSeparatorIndex = s.IndexOf(':');
+            if (receiptSeparatorIndex > 0)
+                s = s.Substring(0, receiptSeparatorIndex).Trim();
 
             // 1. убираем "Оплата в "
             s = Regex.Replace(s, @"^\s*Оплата\s+в\s+", "", RegexOptions.IgnoreCase);
@@ -759,7 +770,8 @@ WHERE t.accountid = @accountid
             if (e.Source is TabControl tabControl)
             {
                 var selectedTab = tabControl.SelectedItem as TabItem;
-                if (selectedTab != null && selectedTab.Header?.ToString() == "БЮДЖЕТЫ ПО КАТЕГОРИЯМ")
+                if (selectedTab != null &&
+                    string.Equals(selectedTab.Header?.ToString()?.Trim(), "Бюджеты по категориям", StringComparison.OrdinalIgnoreCase))
                 {
                     LoadBudgetTab();
                 }
@@ -809,6 +821,21 @@ WHERE t.accountid = @accountid
                             }
                         }
                     }
+                }
+
+                if (categoryNames.Count == 0)
+                {
+                    BudgetComparisonChart.Series = new SeriesCollection();
+                    BudgetComparisonChart.AxisX = new AxesCollection { new Axis { Labels = Array.Empty<string>() } };
+                    BudgetComparisonChart.AxisY = new AxesCollection
+                    {
+                        new Axis
+                        {
+                            Title = "Сумма",
+                            LabelFormatter = v => v.ToString("N0")
+                        }
+                    };
+                    return;
                 }
 
                 // Разделяем фактические значения на две серии: в пределах бюджета и с превышением

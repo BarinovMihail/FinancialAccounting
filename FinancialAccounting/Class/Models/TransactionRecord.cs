@@ -59,11 +59,36 @@ namespace FinancialAccounting.Class.Models
             get { return _predictionSource; }
             set
             {
-                if (_predictionSource != value)
+                var displayValue = ToDisplayPredictionSource(value);
+                if (_predictionSource != displayValue)
                 {
-                    _predictionSource = value;
+                    _predictionSource = displayValue;
                     OnPropertyChanged(nameof(PredictionSource));
                 }
+            }
+        }
+
+        private static string ToDisplayPredictionSource(string source)
+        {
+            if (string.IsNullOrWhiteSpace(source))
+                return string.Empty;
+
+            switch (source.Trim().ToLowerInvariant())
+            {
+                case "exact_match":
+                    return "Пользовательские исправления";
+                case "merchant_rule":
+                    return "Известная категория";
+                case "transfer_rule":
+                    return "Правило перевода";
+                case "web_ai":
+                    return "Поиск в интернете";
+                case "ml":
+                    return "ML-модель";
+                case "fallback":
+                    return "Без точного совпадения";
+                default:
+                    return source;
             }
         }
 
