@@ -4,6 +4,7 @@
         Title="Отчёты" Height="640" Width="980"
         Background="#FFF4F7FB"
         WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
         FontFamily="Segoe UI"
         Foreground="#1F2937">
 
@@ -360,6 +361,7 @@
             <DataGrid x:Name="ReportDataGrid"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
+                      SelectionMode="Single"
                       HeadersVisibility="Column"
                       Background="White"
                       Foreground="#1F2937"
@@ -433,6 +435,11 @@
                 <!-- Кнопки действий -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal"
                             VerticalAlignment="Center" HorizontalAlignment="Right">
+
+                    <Button Content="Удалить запись"
+                            Width="140"
+                            Style="{StaticResource DangerButtonStyle}"
+                            Click="DeleteSelectedRecord_Click"/>
 
                     <ComboBox x:Name="ExportFormatComboBox"
                               Width="110" Height="36"

@@ -88,8 +88,8 @@ namespace FinancialAccounting
             if (total <= 0) return;
 
             // настройки
-            const int topN = 6;              // можно 5-7
-            const int minPercentToShow = 3;  // <-- порог (2 или 3 обычно лучше всего)
+            const int topN = 5;
+            const int minPercentToShow = 5;
 
             // LabelPoint лучше через Participation
             Func<ChartPoint, string> labelPoint = cp => cp.Participation.ToString("P0", CultureInfo.InvariantCulture);

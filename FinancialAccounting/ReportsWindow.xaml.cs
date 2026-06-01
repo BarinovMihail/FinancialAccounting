@@ -115,7 +115,11 @@ namespace FinancialAccounting
 
         private void ApplyFilters_Click(object sender, RoutedEventArgs e)
         {
+            LoadFilteredData();
+        }
 
+        private void LoadFilteredData()
+        {
             List<ReportRecord> filteredData = new List<ReportRecord>();
 
             try
@@ -124,7 +128,7 @@ namespace FinancialAccounting
                 using (var cmd = db.GetOpenConnection().CreateCommand())
                 {
                     StringBuilder query = new StringBuilder(@"
-                SELECT t.date, t.type, c.name AS category, t.amount, t.description
+                SELECT t.id, t.date, t.type, c.name AS category, t.amount, t.description
                 FROM transactions t
                 LEFT JOIN categories c ON t.categoryid = c.id
                 WHERE t.accountid = @accountId");
@@ -174,37 +178,87 @@ namespace FinancialAccounting
                         {
                             filteredData.Add(new ReportRecord
                             {
-                                Date = reader.GetDateTime(0).ToString("dd.MM.yyyy"),
-                                Type = reader.GetString(1),
-                                Category = reader.IsDBNull(2) ? "Без категории" : reader.GetString(2),
-                                Amount = reader.GetDecimal(3),
-                                Description = reader.IsDBNull(4) ? "" : reader.GetString(4)
+                                Id = reader.GetInt32(0),
+                                Date = reader.GetDateTime(1).ToString("dd.MM.yyyy"),
+                                Type = reader.GetString(2),
+                                Category = reader.IsDBNull(3) ? "Без категории" : reader.GetString(3),
+                                Amount = reader.GetDecimal(4),
+                                Description = reader.IsDBNull(5) ? "" : reader.GetString(5)
                             });
                         }
                     }
-                    // Подсчёт итогов
-                    decimal totalIncome = filteredData
-                        .Where(r => r.Type == "Income")
-                        .Sum(r => r.Amount);
-
-                    decimal totalExpense = Math.Abs(
-                     filteredData
-                        .Where(r => r.Type == "Expense")
-                        .Sum(r => r.Amount)
-                        );
-
-                    decimal balance = totalIncome - totalExpense;
-
-                    IncomeTotalTextBlock.Text = $"Доходы: {totalIncome:F2} ₽";
-                    ExpenseTotalTextBlock.Text = $"Расходы: {totalExpense:F2} ₽";
-                    BalanceTotalTextBlock.Text = $"Итог: {balance:F2} ₽";
-
-                    ReportDataGrid.ItemsSource = filteredData;
                 }
+
+                UpdateTotals(filteredData);
+                ReportDataGrid.ItemsSource = filteredData;
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Ошибка при загрузке данных: " + ex.Message);
+            }
+        }
+
+        private void UpdateTotals(List<ReportRecord> filteredData)
+        {
+            decimal totalIncome = filteredData
+                .Where(r => r.Type == "Income")
+                .Sum(r => r.Amount);
+
+            decimal totalExpense = Math.Abs(
+                filteredData
+                    .Where(r => r.Type == "Expense")
+                    .Sum(r => r.Amount)
+            );
+
+            decimal balance = totalIncome - totalExpense;
+
+            IncomeTotalTextBlock.Text = $"Доходы: {totalIncome:F2} ₽";
+            ExpenseTotalTextBlock.Text = $"Расходы: {totalExpense:F2} ₽";
+            BalanceTotalTextBlock.Text = $"Итог: {balance:F2} ₽";
+        }
+
+        private void DeleteSelectedRecord_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(ReportDataGrid.SelectedItem is ReportRecord selectedRecord))
+            {
+                MessageBox.Show("Сначала выберите запись для удаления.", "Удаление", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var confirmation = MessageBox.Show(
+                $"Удалить запись от {selectedRecord.Date} на сумму {selectedRecord.Amount:F2}?",
+                "Подтверждение удаления",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (confirmation != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            try
+            {
+                using (var db = new DatabaseManager())
+                using (var cmd = db.GetOpenConnection().CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM transactions WHERE id = @id AND accountid = @accountId";
+                    cmd.Parameters.AddWithValue("id", selectedRecord.Id);
+                    cmd.Parameters.AddWithValue("accountId", _accountId);
+
+                    int affectedRows = cmd.ExecuteNonQuery();
+                    if (affectedRows == 0)
+                    {
+                        MessageBox.Show("Запись не найдена или уже была удалена.", "Удаление", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+                }
+
+                LoadFilteredData();
+                MessageBox.Show("Запись удалена.", "Удаление", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при удалении записи: " + ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -597,6 +651,7 @@ namespace FinancialAccounting
 }
 public class ReportRecord
 {
+    public int Id { get; set; }
     public string Date { get; set; }
     public string Type { get; set; }
     public string Category { get; set; }

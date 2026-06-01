@@ -27,7 +27,7 @@ namespace FinancialAccounting.Class.Parsers
                              @"\s*" +                              // Возможные пробелы перед описанием
                              @"(.*?)" +                            // 3. Описание (захватывает всё до номера карты)
                              @"(?:\d{4}|—)" +                      // Номер карты (4 цифры) или прочерк
-                                                                   // Lookahead для остановки перед следующей записью
+                                                                  
                              @"(?=\s*\d{2}\.\d{2}\.\d{4}|" +       // Следующая дата
                              @"\s*Дата\s+и\s+время|" +
                              @"\s*Пополнения:|" +
@@ -103,7 +103,7 @@ namespace FinancialAccounting.Class.Parsers
                     return true;
             }
 
-            if (description.Length > 250) // Чуть увеличили лимит, т.к. номера теперь сохраняются
+            if (description.Length > 250) 
                 return true;
 
             return false;
