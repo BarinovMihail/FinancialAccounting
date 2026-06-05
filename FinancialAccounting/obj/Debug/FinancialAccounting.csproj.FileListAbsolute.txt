@@ -189,4 +189,11 @@ C:\Users\misha\AppData\Local\Temp\FinAccBuild\arm64\libSkiaSharp.dll
 C:\Users\misha\AppData\Local\Temp\FinAccBuild\FinancialAccounting.exe.config
 C:\Users\misha\AppData\Local\Temp\FinAccBuild\FinancialAccounting.exe
 C:\Users\misha\AppData\Local\Temp\FinAccBuild\FinancialAccounting.pdb
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\_codex_build\libSkiaSharp.dylib
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\_codex_build\x86\libSkiaSharp.dll
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\_codex_build\x64\libSkiaSharp.dll
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\_codex_build\arm64\libSkiaSharp.dll
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\_codex_build\FinancialAccounting.exe.config
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\_codex_build\FinancialAccounting.exe
+C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\_codex_build\FinancialAccounting.pdb
 C:\Users\misha\OneDrive\Documents\FinAcc\FinancialAccounting\FinancialAccounting\obj\Debug\FinancialAccounting.exe.config

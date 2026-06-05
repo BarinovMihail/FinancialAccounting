@@ -85,12 +85,76 @@
             <TabItem Header="Графики и анализ">
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="3*"/>
                         <RowDefinition Height="2*"/>
                     </Grid.RowDefinitions>
 
+                    <!-- Быстрая сводка по текущей выборке -->
+                    <UniformGrid Grid.Row="0" Columns="4" Margin="0,0,0,10">
+                        <Border CornerRadius="8" BorderBrush="#FFE0B2" BorderThickness="1" Padding="10" Margin="0,0,10,10" Background="White">
+                            <StackPanel>
+                                <TextBlock Text="Общий доход" Foreground="#C76A00" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="TotalIncomeText" FontSize="18" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border CornerRadius="8" BorderBrush="#FFE0B2" BorderThickness="1" Padding="10" Margin="0,0,10,10" Background="White">
+                            <StackPanel>
+                                <TextBlock Text="Общий расход" Foreground="#C76A00" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="TotalExpenseText" FontSize="18" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border CornerRadius="8" BorderBrush="#FFE0B2" BorderThickness="1" Padding="10" Margin="0,0,10,10" Background="White">
+                            <StackPanel>
+                                <TextBlock Text="Средний доход" Foreground="#C76A00" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="AverageIncomeText" FontSize="18" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border CornerRadius="8" BorderBrush="#FFE0B2" BorderThickness="1" Padding="10" Margin="0,0,0,10" Background="White">
+                            <StackPanel>
+                                <TextBlock Text="Средний расход" Foreground="#C76A00" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="AverageExpenseText" FontSize="18" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border CornerRadius="8" BorderBrush="#FFE0B2" BorderThickness="1" Padding="10" Margin="0,0,10,0" Background="White">
+                            <StackPanel>
+                                <TextBlock Text="Макс. доход за период" Foreground="#C76A00" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="SummaryMaxIncomeText" FontSize="18" Margin="0,6,0,0"/>
+                                <TextBlock x:Name="SummaryMaxIncomeDateText" Opacity="0.75"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border CornerRadius="8" BorderBrush="#FFE0B2" BorderThickness="1" Padding="10" Margin="0,0,10,0" Background="White">
+                            <StackPanel>
+                                <TextBlock Text="Мин. доход за период" Foreground="#C76A00" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="SummaryMinIncomeText" FontSize="18" Margin="0,6,0,0"/>
+                                <TextBlock x:Name="SummaryMinIncomeDateText" Opacity="0.75"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border CornerRadius="8" BorderBrush="#FFE0B2" BorderThickness="1" Padding="10" Margin="0,0,10,0" Background="White">
+                            <StackPanel>
+                                <TextBlock Text="Макс. расход за период" Foreground="#C76A00" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="SummaryMaxExpenseText" FontSize="18" Margin="0,6,0,0"/>
+                                <TextBlock x:Name="SummaryMaxExpenseDateText" Opacity="0.75"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border CornerRadius="8" BorderBrush="#FFE0B2" BorderThickness="1" Padding="10" Margin="0,0,0,0" Background="White">
+                            <StackPanel>
+                                <TextBlock Text="Мин. расход за период" Foreground="#C76A00" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="SummaryMinExpenseText" FontSize="18" Margin="0,6,0,0"/>
+                                <TextBlock x:Name="SummaryMinExpenseDateText" Opacity="0.75"/>
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+
                     <!-- Графики -->
-                    <Border Grid.Row="0"
+                    <Border Grid.Row="1"
                             Background="White"
                             BorderBrush="#FFE0B2"
                             BorderThickness="1"
@@ -112,7 +176,7 @@
                     </Border>
 
                     <!-- Умные рекомендации — AI-ассистент -->
-                    <Border Grid.Row="1"
+                    <Border Grid.Row="2"
                             Background="#FAFAFA"
                             BorderBrush="#FFE0B2"
                             BorderThickness="1"

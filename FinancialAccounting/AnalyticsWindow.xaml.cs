@@ -23,6 +23,7 @@ namespace FinancialAccounting
         private readonly int _accountId;
         private readonly List<TransactionPoint> data = new List<TransactionPoint>();
         private List<DailyPoint> _daily = new List<DailyPoint>();
+        private List<ChartBucket> _currentBuckets = new List<ChartBucket>();
         public ObservableCollection<ChatMessage> ChatMessages { get; set; } = new ObservableCollection<ChatMessage>();
         private readonly MistralService _mistralService = new MistralService(new HttpClient());
 
@@ -39,6 +40,7 @@ namespace FinancialAccounting
 
             LoadCategories();
             InitDashboardEmpty();
+            InitSummaryEmpty();
             LoadBudgetTab();
         }
 
@@ -75,7 +77,34 @@ namespace FinancialAccounting
 
             Top5ExpensesChart.Series = new SeriesCollection();
             Top5ExpensesChart.AxisX = new AxesCollection { new Axis { Labels = Array.Empty<string>() } };
-            Top5ExpensesChart.AxisY = new AxesCollection { new Axis { LabelFormatter = v => v.ToString("N0") } };
+            Top5ExpensesChart.AxisY = new AxesCollection { new Axis { LabelFormatter = v => FormatRub(v) } };
+        }
+
+        private void InitSummaryEmpty()
+        {
+            TotalIncomeText.Text = "—";
+            TotalExpenseText.Text = "—";
+            AverageIncomeText.Text = "—";
+            AverageExpenseText.Text = "—";
+
+            SummaryMaxIncomeText.Text = "—";
+            SummaryMaxIncomeDateText.Text = "";
+            SummaryMinIncomeText.Text = "—";
+            SummaryMinIncomeDateText.Text = "";
+            SummaryMaxExpenseText.Text = "—";
+            SummaryMaxExpenseDateText.Text = "";
+            SummaryMinExpenseText.Text = "—";
+            SummaryMinExpenseDateText.Text = "";
+        }
+
+        private static string FormatRub(decimal value, int decimals = 0)
+        {
+            return $"{value.ToString("N" + decimals)} ₽";
+        }
+
+        private static string FormatRub(double value, int decimals = 0)
+        {
+            return $"{value.ToString("N" + decimals)} ₽";
         }
 
         private void LoadCategories()
@@ -226,17 +255,17 @@ WHERE t.accountid = @accountid
                     }
                 }
 
-                // Всегда обновляем дашборд по текущей выборке
-                RefreshDashboard();
-
                 // Очищаем графики
                 MainChart.Series.Clear();
                 MainChart.AxisX.Clear();
                 MainChart.AxisY.Clear();
                 PieChart.Series.Clear();
+                _currentBuckets.Clear();
 
                 if (data.Count == 0)
                 {
+                    RefreshDashboard();
+                    InitSummaryEmpty();
                     MainChart.Visibility = Visibility.Visible;
                     PieChart.Visibility = Visibility.Collapsed;
                     SetupAxesByLabels(Array.Empty<string>());
@@ -248,6 +277,11 @@ WHERE t.accountid = @accountid
                     .Select(g => new DailyPoint { Date = g.Key, Sum = g.Sum(x => x.Amount) })
                     .OrderBy(x => x.Date)
                     .ToList();
+
+                _currentBuckets = DownsampleDaily(_daily, 140);
+
+                // Обновляем сводки после формирования тех же периодов, что и на графике
+                RefreshDashboard();
 
                 if (chartType == "Круговая диаграмма")
                 {
@@ -265,7 +299,7 @@ WHERE t.accountid = @accountid
                 MainChart.Visibility = Visibility.Visible;
                 PieChart.Visibility = Visibility.Collapsed;
 
-                var buckets = DownsampleDaily(_daily, 140);
+                var buckets = _currentBuckets;
                 var values = new ChartValues<double>(buckets.Select(b => (double)b.Sum));
                 var labels = buckets.Select(b => b.Label).ToArray();
 
@@ -287,7 +321,7 @@ WHERE t.accountid = @accountid
                             var dateText = b.StartDate == b.EndDate
                                 ? b.StartDate.ToString("dd.MM.yyyy")
                                 : $"{b.StartDate:dd.MM.yyyy}-{b.EndDate:dd.MM.yyyy}";
-                            return $"{dateText}\nСумма: {b.Sum:N0}";
+                            return $"{dateText}\nСумма: {FormatRub(b.Sum)}";
                         }
                     };
                     MainChart.Series.Add(series);
@@ -315,7 +349,7 @@ WHERE t.accountid = @accountid
                             var dateText = b.StartDate == b.EndDate
                                 ? b.StartDate.ToString("dd.MM.yyyy")
                                 : $"{b.StartDate:dd.MM.yyyy}-{b.EndDate:dd.MM.yyyy}";
-                            return $"{dateText}\nСумма: {b.Sum:N0}";
+                            return $"{dateText}\nСумма: {FormatRub(b.Sum)}";
                         }
                     };
                     MainChart.Series.Add(lineSeries);
@@ -342,6 +376,8 @@ WHERE t.accountid = @accountid
             {
                 Title = "Дата",
                 Labels = labels ?? Array.Empty<string>(),
+                Foreground = Brushes.Black,
+                FontSize = 15,
                 LabelsRotation = 15,
                 Separator = new LiveCharts.Wpf.Separator { Step = step }
             });
@@ -349,7 +385,9 @@ WHERE t.accountid = @accountid
             MainChart.AxisY.Add(new Axis
             {
                 Title = "Сумма",
-                LabelFormatter = v => v.ToString("N0")
+                Foreground = Brushes.Black,
+                FontSize = 15,
+                LabelFormatter = v => FormatRub(v)
             });
         }
 
@@ -409,7 +447,7 @@ WHERE t.accountid = @accountid
             public string Merchant { get; set; }
             public int Count { get; set; }
             public decimal Sum { get; set; }
-            public string SumText => Sum.ToString("N0");
+            public string SumText => FormatRub(Sum);
         }
 
         private void RefreshDashboard()
@@ -417,13 +455,15 @@ WHERE t.accountid = @accountid
             var incomes = data.Where(x => x.Type == "Income").ToList();
             var expenses = data.Where(x => x.Type == "Expense").ToList(); // Amount отрицательный
 
+            RefreshSummary(incomes, expenses);
+
             var maxIncome = incomes.OrderByDescending(x => x.Amount).FirstOrDefault();
-            MaxIncomeText.Text = maxIncome == null ? "—" : $"{maxIncome.Amount:N0}";
+            MaxIncomeText.Text = maxIncome == null ? "—" : FormatRub(maxIncome.Amount);
             MaxIncomeDateText.Text = maxIncome == null ? "" : $"{maxIncome.Date:dd.MM.yyyy}";
 
             // самый большой расход = самое отрицательное
             var maxExpense = expenses.OrderBy(x => x.Amount).FirstOrDefault();
-            MaxExpenseText.Text = maxExpense == null ? "—" : $"{Math.Abs(maxExpense.Amount):N0}";
+            MaxExpenseText.Text = maxExpense == null ? "—" : FormatRub(Math.Abs(maxExpense.Amount));
             MaxExpenseDateText.Text = maxExpense == null ? "" : $"{maxExpense.Date:dd.MM.yyyy}";
 
             // популярный супермаркет по количеству чеков/позиций
@@ -438,7 +478,7 @@ WHERE t.accountid = @accountid
                 .FirstOrDefault();
 
             TopMarketText.Text = marketAgg == null ? "—" : $"{marketAgg.Merchant} ({marketAgg.Count} чек.)";
-            TopMarketSumText.Text = marketAgg == null ? "" : $"Потрачено: {marketAgg.Sum:N0}";
+            TopMarketSumText.Text = marketAgg == null ? "" : $"Потрачено: {FormatRub(marketAgg.Sum)}";
 
             // Top‑5 супермаркетов (список)
             var topMarkets10 = expenses
@@ -478,7 +518,7 @@ WHERE t.accountid = @accountid
                     {
                         int i = (int)p.X;
                         if (i < 0 || i >= top5.Count) return "";
-                        return $"{top5[i].Category}\n{top5[i].Sum:N0}";
+                        return $"{top5[i].Category}\n{FormatRub(top5[i].Sum)}";
                     }
                 }
             };
@@ -494,8 +534,56 @@ WHERE t.accountid = @accountid
 
             Top5ExpensesChart.AxisY = new AxesCollection
             {
-                new Axis { LabelFormatter = v => v.ToString("N0") }
+                new Axis { LabelFormatter = v => FormatRub(v) }
             };
+        }
+
+        private void RefreshSummary(List<TransactionPoint> incomes, List<TransactionPoint> expenses)
+        {
+            if ((incomes == null || incomes.Count == 0) && (expenses == null || expenses.Count == 0))
+            {
+                InitSummaryEmpty();
+                return;
+            }
+
+            var totalIncome = incomes.Sum(x => x.Amount);
+            var totalExpense = expenses.Sum(x => Math.Abs(x.Amount));
+
+            TotalIncomeText.Text = FormatRub(totalIncome);
+            TotalExpenseText.Text = FormatRub(-totalExpense);
+            AverageIncomeText.Text = incomes.Count == 0 ? "—" : FormatRub(incomes.Average(x => x.Amount));
+            AverageExpenseText.Text = expenses.Count == 0 ? "—" : FormatRub(-expenses.Average(x => Math.Abs(x.Amount)));
+
+            var chartBuckets = _currentBuckets ?? new List<ChartBucket>();
+            var positiveBuckets = chartBuckets.Where(x => x.Sum > 0).ToList();
+            var negativeBuckets = chartBuckets.Where(x => x.Sum < 0).ToList();
+
+            var maxIncome = positiveBuckets.OrderByDescending(x => x.Sum).FirstOrDefault();
+            var minIncome = positiveBuckets.OrderBy(x => x.Sum).FirstOrDefault();
+            var maxExpense = negativeBuckets.OrderBy(x => x.Sum).FirstOrDefault();
+            var minExpense = negativeBuckets.OrderByDescending(x => x.Sum).FirstOrDefault();
+
+            SummaryMaxIncomeText.Text = maxIncome == null ? "—" : FormatRub(maxIncome.Sum);
+            SummaryMaxIncomeDateText.Text = maxIncome == null ? "" : GetBucketPeriodText(maxIncome);
+
+            SummaryMinIncomeText.Text = minIncome == null ? "—" : FormatRub(minIncome.Sum);
+            SummaryMinIncomeDateText.Text = minIncome == null ? "" : GetBucketPeriodText(minIncome);
+
+            SummaryMaxExpenseText.Text = maxExpense == null ? "—" : FormatRub(maxExpense.Sum);
+            SummaryMaxExpenseDateText.Text = maxExpense == null ? "" : GetBucketPeriodText(maxExpense);
+
+            SummaryMinExpenseText.Text = minExpense == null ? "—" : FormatRub(minExpense.Sum);
+            SummaryMinExpenseDateText.Text = minExpense == null ? "" : GetBucketPeriodText(minExpense);
+        }
+
+        private string GetBucketPeriodText(ChartBucket bucket)
+        {
+            if (bucket == null)
+                return "";
+
+            return bucket.StartDate == bucket.EndDate
+                ? bucket.StartDate.ToString("dd.MM.yyyy")
+                : $"{bucket.StartDate:dd.MM.yyyy}-{bucket.EndDate:dd.MM.yyyy}";
         }
 
         private bool IsSupermarketExpense(TransactionPoint transaction)
@@ -652,9 +740,9 @@ WHERE t.accountid = @accountid
                 var totalExpense = data.Where(x => x.Type == "Expense").Sum(x => Math.Abs(x.Amount));
 
                 sb.AppendLine(string.Format("Количество транзакций: {0}", data.Count));
-                sb.AppendLine(string.Format("Общий доход: {0:N0} руб.", totalIncome));
-                sb.AppendLine(string.Format("Общий расход: {0:N0} руб.", totalExpense));
-                sb.AppendLine(string.Format("Баланс (доход - расход): {0:N0} руб.", totalIncome - totalExpense));
+                sb.AppendLine(string.Format("Общий доход: {0}", FormatRub(totalIncome)));
+                sb.AppendLine(string.Format("Общий расход: {0}", FormatRub(totalExpense)));
+                sb.AppendLine(string.Format("Баланс (доход - расход): {0}", FormatRub(totalIncome - totalExpense)));
                 sb.AppendLine();
                 sb.AppendLine(GetTopExpenseCategoriesSummary());
                 sb.AppendLine(GetLargestTransactionsSummary());
@@ -701,7 +789,7 @@ WHERE t.accountid = @accountid
 
             var sb = new StringBuilder("Топ-5 категорий расходов:");
             foreach (var item in top)
-                sb.AppendLine(string.Format("  - {0}: {1:N0} руб.", item.Category, item.Sum));
+                sb.AppendLine(string.Format("  - {0}: {1}", item.Category, FormatRub(item.Sum)));
 
             return sb.ToString();
         }
@@ -721,8 +809,8 @@ WHERE t.accountid = @accountid
             {
                 var desc = (t.Description ?? "").Trim();
                 if (desc.Length > 60) desc = desc.Substring(0, 60) + "...";
-                sb.AppendLine(string.Format("  - {0:dd.MM.yyyy}, {1}, {2:N0} руб., {3}",
-                    t.Date, t.Category, Math.Abs(t.Amount), desc));
+                sb.AppendLine(string.Format("  - {0:dd.MM.yyyy}, {1}, {2}, {3}",
+                    t.Date, t.Category, FormatRub(Math.Abs(t.Amount)), desc));
             }
 
             return sb.ToString();
@@ -745,13 +833,13 @@ WHERE t.accountid = @accountid
             if (anomalies.Count == 0)
                 return "Аномалии: аномальных трат не обнаружено (порог: 2x от среднего).";
 
-            var sb = new StringBuilder(string.Format("Возможные аномалии (>2x от среднего {0:N0} руб.):", avgExpense));
+            var sb = new StringBuilder(string.Format("Возможные аномалии (>2x от среднего {0}):", FormatRub(avgExpense)));
             foreach (var t in anomalies)
             {
                 var desc = (t.Description ?? "").Trim();
                 if (desc.Length > 50) desc = desc.Substring(0, 50) + "...";
-                sb.AppendLine(string.Format("  - {0:dd.MM.yyyy}, {1}, {2:N0} руб., {3}",
-                    t.Date, t.Category, Math.Abs(t.Amount), desc));
+                sb.AppendLine(string.Format("  - {0:dd.MM.yyyy}, {1}, {2}, {3}",
+                    t.Date, t.Category, FormatRub(Math.Abs(t.Amount)), desc));
             }
 
             return sb.ToString();
@@ -832,7 +920,7 @@ WHERE t.accountid = @accountid
                         new Axis
                         {
                             Title = "Сумма",
-                            LabelFormatter = v => v.ToString("N0")
+                            LabelFormatter = v => FormatRub(v)
                         }
                     };
                     return;
@@ -869,7 +957,7 @@ WHERE t.accountid = @accountid
                         DataLabels = true,
                         MaxColumnWidth = 40,
                         Fill = new SolidColorBrush(Color.FromRgb(0x33, 0x98, 0xDB)),
-                        LabelPoint = p => p.Y == 0 ? "" : p.Y.ToString("N0")
+                        LabelPoint = p => p.Y == 0 ? "" : FormatRub(p.Y)
                     },
                     new ColumnSeries
                     {
@@ -878,7 +966,7 @@ WHERE t.accountid = @accountid
                         DataLabels = true,
                         MaxColumnWidth = 40,
                         Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0x45, 0x00)),
-                        LabelPoint = p => p.Y == 0 ? "" : p.Y.ToString("N0")
+                        LabelPoint = p => p.Y == 0 ? "" : FormatRub(p.Y)
                     },
                     new ColumnSeries
                     {
@@ -886,7 +974,7 @@ WHERE t.accountid = @accountid
                         Values = new ChartValues<double>(budgetValues),
                         DataLabels = true,
                         MaxColumnWidth = 40,
-                        LabelPoint = p => p.Y.ToString("N0")
+                        LabelPoint = p => FormatRub(p.Y)
                     }
                 };
 
@@ -904,7 +992,7 @@ WHERE t.accountid = @accountid
                     new Axis
                     {
                         Title = "Сумма",
-                        LabelFormatter = v => v.ToString("N0")
+                        LabelFormatter = v => FormatRub(v)
                     }
                 };
 
@@ -917,7 +1005,7 @@ WHERE t.accountid = @accountid
                     foreach (var item in overspendCategories)
                     {
                         double over = item.Actual - item.Budget;
-                        sb.AppendLine($"• {item.Name}: потрачено {item.Actual:N2} ₽ из {item.Budget:N2} ₽ (превышение на {over:N2} ₽)");
+                        sb.AppendLine($"• {item.Name}: потрачено {FormatRub(item.Actual, 2)} из {FormatRub(item.Budget, 2)} (превышение на {FormatRub(over, 2)})");
                     }
                     MessageBox.Show(sb.ToString(), "Превышение бюджета",
                                     MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -960,4 +1048,5 @@ WHERE t.accountid = @accountid
         public DateTime Date { get; set; }
         public decimal Sum { get; set; }
     }
+
 }

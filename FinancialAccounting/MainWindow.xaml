@@ -1,4 +1,4 @@
-﻿ <Window x:Class="FinancialAccounting.MainWindow"
+﻿<Window x:Class="FinancialAccounting.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:lvc="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
