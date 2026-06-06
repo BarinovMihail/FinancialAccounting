@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FinAccTest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f2fe171929587bcba5dabaff0db235c5fa79560e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5723727d10278cdaa33fa56c12a587b5e89aae65")]
 [assembly: System.Reflection.AssemblyProductAttribute("FinAccTest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FinAccTest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

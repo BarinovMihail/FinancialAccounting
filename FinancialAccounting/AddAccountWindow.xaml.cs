@@ -78,14 +78,13 @@ namespace FinancialAccounting
                         {
                             // ВАЖНО: В твоей новой схеме в accounts есть поле bankid, а не bankname
                             cmd.CommandText = @"
-                                INSERT INTO accounts (userid, bankid, accountnumber, balance)
-                                VALUES (@userid, @bankid, @accountnumber, @balance);
+                                INSERT INTO accounts (userid, bankid, accountnumber)
+                                VALUES (@userid, @bankid, @accountnumber);
                             ";
 
                             cmd.Parameters.AddWithValue("userid", userId);
                             cmd.Parameters.AddWithValue("bankid", bankId); // Передаем ID банка
                             cmd.Parameters.AddWithValue("accountnumber", cardNumber);
-                            cmd.Parameters.AddWithValue("balance", 0m); // Используй decimal (0m) для денег
 
                             cmd.ExecuteNonQuery();
                         }
