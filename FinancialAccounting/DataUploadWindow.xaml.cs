@@ -1,4 +1,4 @@
-﻿using ExcelDataReader;
+using ExcelDataReader;
 using FinancialAccounting.Class;
 using FinancialAccounting.Class.Models;
 using FinancialAccounting.Class.Parsers;
@@ -596,6 +596,9 @@ namespace FinancialAccounting
             ProgressBar.Value = 0;
             ProgressText.Text = "Сохранение транзакций...";
 
+            int insertedCount = 0;
+            int updatedCount = 0;
+
             await Task.Run(() =>
             {
                 using (var db = new DatabaseManager())
@@ -658,7 +661,6 @@ namespace FinancialAccounting
 
                             if (existingIdObj != null)
                             {
-
                                 int existingId = Convert.ToInt32(existingIdObj);
 
                                 using (var updateCmd = new NpgsqlCommand(
@@ -669,14 +671,14 @@ namespace FinancialAccounting
                                     updateCmd.ExecuteNonQuery();
                                 }
 
+                                updatedCount++;
                                 current++;
                                 Application.Current.Dispatcher.Invoke(() => { ProgressBar.Value = (double)current / total * 100; });
                                 continue;
                             }
                         }
 
-
-                        // 3. Вставка
+                        // Вставка новой транзакции
                         using (var insertTransactionCmd = new NpgsqlCommand(@"
                             INSERT INTO transactions 
                             (date, amount, type, categoryid, description, accountid)
@@ -693,6 +695,7 @@ namespace FinancialAccounting
                             insertTransactionCmd.ExecuteNonQuery();
                         }
 
+                        insertedCount++;
                         current++;
                         Application.Current.Dispatcher.Invoke(() => { ProgressBar.Value = (double)current / total * 100; });
                     }
@@ -704,7 +707,13 @@ namespace FinancialAccounting
             ProgressBar.Visibility = Visibility.Collapsed;
             ProgressText.Text = "";
 
-            MessageBox.Show("Транзакции успешно сохранены в базу данных!");
+            MessageBox.Show(
+                $"Сохранение завершено!\n\n" +
+                $"✅ Добавлено новых: {insertedCount}\n" +
+                $"🔄 Обновлено (дубли): {updatedCount}",
+                "Результат сохранения",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
 
         private void ApplyFilter()
@@ -1299,7 +1308,7 @@ namespace FinancialAccounting
         private string ExtractReceiptDate(List<string> lines)
         {
             var dateMatch = lines
-                .Select(line => Regex.Match(line, @"(?<date>\d{1,2}[./-]\d{1,2}[./-]\d{2,4})(?:\s+(?<time>\d{1,2}:\d{2}(?::\d{2})?))?"))
+                .Select(line => Regex.Match(line, @"(?<date>\d{1,2}[./-]\d{1,2}[./-]\d{2,4})(?:\s+(?<time>\d{1,2}:\d{2}(?::\d{2})?))?" ))
                 .FirstOrDefault(match => match.Success);
 
             if (dateMatch != null && dateMatch.Success)
@@ -1379,7 +1388,7 @@ namespace FinancialAccounting
             string normalized = (line ?? string.Empty).Trim();
             normalized = normalized.Replace('\t', ' ');
             normalized = normalized.Replace("|", " ");
-            normalized = normalized.Replace("’", "'");
+            normalized = normalized.Replace("'", "'");
             normalized = normalized.Replace("`", "'");
             normalized = Regex.Replace(normalized, @"\s{2,}", " ");
             return normalized.Trim();
@@ -1445,7 +1454,7 @@ namespace FinancialAccounting
                 return null;
             }
 
-            string amountPattern = Regex.Escape(amount.ToString("0.00", CultureInfo.InvariantCulture)).Replace("\\.", "[\\.,]");
+            string amountPattern = Regex.Escape(amount.ToString("0.00", CultureInfo.InvariantCulture)).Replace("\\.", "[\\.\\,]");
             var amountMatch = Regex.Match(line, amountPattern);
             string namePart = amountMatch.Success
                 ? line.Substring(0, amountMatch.Index)
